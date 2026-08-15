@@ -1,0 +1,23 @@
+# ===== Python虚拟环境，不上传 =====
+env/
+
+# ===== 数据目录：原始数据、处理后数据不上传，测试样本保留提交 =====
+data/raw_data/
+data/process_data/
+
+# ===== 模型权重、训练日志不上传 =====
+output/model_weight/
+output/log/
+
+# ===== Python缓存垃圾文件 =====
+__pycache__/
+*.pyc
+*.pth
+
+# ===== VSCode本地个人配置（注意！！不要把.vscode写进来！！） =====
+# .vscode 我们要提交！因为里面放团队统一的settings、extensions.json，所有人共用
+# 个人电脑生成的 .vscode/.cache 这种才忽略，我们这里不用管
+
+# ===== 操作系统生成的垃圾文件 =====
+.DS_Store
+*.log

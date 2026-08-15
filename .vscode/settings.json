@@ -1,0 +1,25 @@
+{
+    //提交（团队共用格式化）
+    // 保存自动格式化
+    "editor.formatOnSave": true,
+    // 默认格式化工具选用prettier
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    // 各类文件都启用prettier
+    "[python]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[vue]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[markdown]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[yaml]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    // 关闭自动换行
+    "editor.wordWrap": "off",
+    "prettier.tabWidth": 4,
+    "prettier.singleQuote": true,
+    "prettier.trailingComma": "es5"
+}
