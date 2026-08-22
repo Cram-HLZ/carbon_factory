@@ -1,0 +1,21 @@
+# === Web框架（API服务层用）===
+fastapi==0.115.0
+uvicorn==0.30.6
+pydantic==2.9.2
+
+# === 数据处理 ===
+pandas==2.2.2
+numpy==1.26.4
+
+# === 深度学习（LSTM自编码器）===
+torch==2.4.0
+scikit-learn==1.5.1
+
+# === 数据库（后端对接用，算法侧可仅作依赖保留）===
+sqlalchemy==2.0.35
+pymysql==1.1.1
+
+# === 工具 ===
+python-dotenv==1.0.1
+joblib==1.4.2
+matplotlib==3.9.2
