@@ -44,7 +44,11 @@ from feature_engineer.data_loader import DataLoader as FeDataLoader
 from feature_engineer.feature_extractor import FeatureExtractor
 from feature_engineer.sequence_builder import SequenceBuilder
 from Lstm_model.anomaly_detector import AnomalyDetector
-from Lstm_model.predict import ModelPredictor
+try:
+    from Lstm_model.predict import ModelPredictor
+except ImportError:
+    # torch 未安装时降级，异常检测接口退化为统计方法
+    ModelPredictor = None  # type: ignore[assignment,misc]
 
 
 logger = logging.getLogger(__name__)
@@ -65,8 +69,10 @@ _anomaly_detector = AnomalyDetector()
 _predictor_cache: Dict[str, ModelPredictor] = {}
 
 
-def _get_predictor(equipment_id: str) -> Optional[ModelPredictor]:
-    """懒加载 ModelPredictor，未训练时返回 None（API 用兜底逻辑判定异常）"""
+def _get_predictor(equipment_id: str) -> Optional[Any]:
+    """懒加载 ModelPredictor，未训练或 torch 未安装时返回 None（API 用兜底逻辑判定异常）"""
+    if ModelPredictor is None:
+        return None
     if equipment_id in _predictor_cache:
         return _predictor_cache[equipment_id]
     model_path = ModelPredictor.default_model_path(equipment_id)
