@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>下一步执行计划 · 阶段1跑通联调</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:#f5f6f8;color:#1f2937;line-height:1.7;padding:24px}
+  .wrap{max-width:940px;margin:0 auto}
+  header{background:linear-gradient(135deg,#0f766e,#10b981);color:#fff;padding:28px 32px;border-radius:14px 14px 0 0;box-shadow:0 4px 14px rgba(15,118,110,.18)}
+  header h1{font-size:23px;font-weight:700;margin-bottom:6px}
+  header p{font-size:13px;opacity:.92}
+  .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px}
+  .stat{background:rgba(255,255,255,.15);border-radius:8px;padding:10px 12px;text-align:center}
+  .stat .v{font-size:18px;font-weight:700}
+  .stat .l{font-size:11px;opacity:.9;margin-top:2px}
+  .section{background:#fff;border-radius:12px;margin:18px 0;padding:24px 28px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+  .section h2{font-size:18px;color:#0f766e;border-left:4px solid #10b981;padding-left:11px;margin-bottom:6px}
+  .section .sub{font-size:12px;color:#9ca3af;margin-bottom:16px}
+  .step{margin-bottom:22px;padding-bottom:18px;border-bottom:1px dashed #e5e7eb}
+  .step:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+  .step-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .step-head .num{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;background:#0f766e;color:#fff;border-radius:7px;font-size:13px;font-weight:700;flex-shrink:0}
+  .step-head .t{font-size:15px;font-weight:600;color:#1f2937}
+  .step-head .tag{font-size:11px;background:#ecfdf5;color:#0f766e;border:1px solid #a7f3d0;padding:2px 8px;border-radius:10px}
+  .task{display:flex;align-items:flex-start;gap:9px;padding:5px 0 5px 36px;font-size:14px;color:#374151;cursor:pointer}
+  .task:hover{color:#0f766e}
+  .task input{margin-top:3px;width:16px;height:16px;accent-color:#10b981;flex-shrink:0}
+  .task.done{color:#9ca3af;text-decoration:line-through}
+  code{background:#f3f4f6;color:#0f766e;padding:1px 6px;border-radius:4px;font-size:13px;font-family:"Consolas",monospace}
+  .cmd{background:#0f172a;color:#e2e8f0;font-family:"Consolas",monospace;font-size:13px;padding:12px 16px;border-radius:8px;margin:8px 0 8px 36px;overflow-x:auto;white-space:pre}
+  .cmd .c{color:#64748b}
+  pre.code{background:#0f172a;color:#e2e8f0;font-family:"Consolas",monospace;font-size:12.5px;padding:14px 16px;border-radius:8px;margin:8px 0 8px 36px;overflow-x:auto;line-height:1.5}
+  .warn{background:#fffbeb;border:1px solid #fde68a;border-left:4px solid #f59e0b;border-radius:8px;padding:12px 16px;margin:12px 0 12px 36px;font-size:13px;color:#78350f}
+  .warn b{color:#92400e}
+  .ok{background:#ecfdf5;border:1px solid #a7f3d0;border-left:4px solid #10b981;border-radius:8px;padding:12px 16px;margin:12px 0 12px 36px;font-size:13px;color:#065f46}
+  footer{text-align:center;font-size:12px;color:#9ca3af;padding:18px 0 8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>下一步执行计划 · 阶段1 跑通联调</h1>
+    <p>数字孪生锂电工厂碳排AI监测系统 · 单人推进 · 算法侧已就绪，后端从零搭</p>
+    <div class="summary">
+      <div class="stat"><div class="v">8</div><div class="l">算法接口就绪</div></div>
+      <div class="stat"><div class="v">0</div><div class="l">后端代码起步</div></div>
+      <div class="stat"><div class="v">3天</div><div class="l">阶段1预计工期</div></div>
+      <div class="stat"><div class="v">6</div><div class="l">需对接接口数</div></div>
+    </div>
+  </header>
+
+  <div class="section">
+    <h2>核心目标</h2>
+    <div class="sub">阶段1完成 = 前端3个页面能显示算法返回的真实数据，6个接口全部跑通（用模拟数据，不依赖数据库）</div>
+    <div class="ok"><b>为什么先做这个</b>：算法服务现在就能启动，模拟数据现成。先用现成数据把「前端→后端→算法」链路打通，是最快见效、也最不容易卡住的起点。<b>不要等数据库建好才开始联调</b>。</div>
+  </div>
+
+  <div class="section">
+    <h2>Step 1A · 验证算法服务可用 <span style="font-weight:400;font-size:12px;color:#9ca3af">（Day 0 · 半天 · 不需要后端）</span></h2>
+    <div class="sub">先确认算法侧真的能跑、接口真的返回数据。这是后端联调的地基。</div>
+
+    <div class="task"><input type="checkbox" id="a1"><label for="a1">安装依赖：<code>pip install -r requirements.txt</code></label></div>
+    <div class="cmd">cd D:\新建文件夹\carbon_factory
+pip install -r requirements.txt<span class="c">  # torch 装不上也没关系，会自动降级 fallback</span></div>
+
+    <div class="task"><input type="checkbox" id="a2"><label for="a2">启动算法服务</label></div>
+    <div class="cmd">python main.py<span class="c">  # 监听 0.0.0.0:8000</span></div>
+
+    <div class="task"><input type="checkbox" id="a3"><label for="a3">浏览器开 Swagger UI：<code>http://localhost:8000/docs</code>，确认能看到 8 个接口</label></div>
+    <div class="task"><input type="checkbox" id="a4"><label for="a4">健康检查：<code>http://localhost:8000/health</code> 返回 <code>{"status":"healthy"}</code></label></div>
+
+    <div class="task"><input type="checkbox" id="a5"><label for="a5">跑现成测试脚本验证两个接口</label></div>
+    <div class="cmd">python test_api.py<span class="c">  # 验证 anomaly/detect 和 heatmap</span></div>
+
+    <div class="task"><input type="checkbox" id="a6"><label for="a6">Swagger 手动测 4 个核心接口，记录实际响应字段</label></div>
+    <div class="task" style="padding-left:56px;font-size:13px;color:#6b7280"><label>· GET /carbon/overview（无入参）</label></div>
+    <div class="task" style="padding-left:56px;font-size:13px;color:#6b7280"><label>· GET /equipment/list?workshop_id=WS-01</label></div>
+    <div class="task" style="padding-left:56px;font-size:13px;color:#6b7280"><label>· POST /traceability/report（body: <code>{"equipment_id":"I-9-01","anomaly_time":"2026-08-21T14:30:00"}</code>）</label></div>
+    <div class="task" style="padding-left:56px;font-size:13px;color:#6b7280"><label>· POST /strategy/generate（body: <code>{"equipment_id":"I-9-01"}</code>）</label></div>
+
+    <div class="warn"><b>必做</b>：把每个接口的实际响应字段和 <code>docs/algorithm_interface.md</code> 比对，<b>标注差异</b>。算法实际返回可能和文档有出入，后端按实际字段写，别只信文档。</div>
+  </div>
+
+  <div class="section">
+    <h2>Step 1B · 搭后端框架 + 对接前 3 个 GET 接口 <span style="font-weight:400;font-size:12px;color:#9ca3af">（Day 1-2）</span></h2>
+    <div class="sub">后端本质上就是「HTTP 转发算法 + 业务组装」。先做 3 个 GET，前端就能画 3 个页面。</div>
+
+    <div class="task"><input type="checkbox" id="b1"><label for="b1">选技术栈：<b>建议 Python FastAPI</b>（和算法同语言，可复用经验、依赖一致）</label></div>
+    <div class="task"><input type="checkbox" id="b2"><label for="b2">新建后端项目目录（如 <code>backend/</code>），初始化 FastAPI 应用</label></div>
+    <div class="task"><input type="checkbox" id="b3"><label for="b3">封装算法服务 HTTP 客户端（统一 base_url、超时、错误处理）</label></div>
+    <pre class="code"># backend/algorithm_client.py
+import httpx
+
+ALGO_BASE = "http://localhost:8000/api/v1"
+client = httpx.Client(timeout=10.0)
+
+def call_algo(path: str, method="GET", **kw):
+    r = client.request(method, f"{ALGO_BASE}{path}", **kw)
+    return r.json()  # 返回 {code, message, data}</pre>
+
+    <div class="task"><input type="checkbox" id="b4"><label for="b4">后端路由 GET /api/carbon/overview → 转发算法 overview</label></div>
+    <pre class="code"># backend/routes.py
+from fastapi import APIRouter
+from .algorithm_client import call_algo
+router = APIRouter(prefix="/api")
+
+@router.get("/carbon/overview")
+async def overview():
+    return call_algo("/carbon/overview")  # 直接透传，先不加工</pre>
+
+    <div class="task"><input type="checkbox" id="b5"><label for="b5">后端路由 GET /api/carbon/heatmap → 转发（注意要透传 start_time/end_time 参数）</label></div>
+    <div class="task"><input type="checkbox" id="b6"><label for="b6">后端路由 GET /api/equipment/realtime/{id} → 转发</label></div>
+    <div class="task"><input type="checkbox" id="b7"><label for="b7">前端画 3 个页面消费这 3 个接口：厂区总览 / 碳排热力图 / 设备实时</label></div>
+    <div class="task"><input type="checkbox" id="b8"><label for="b8">联调验证：浏览器 → 后端 → 算法，3 个页面能看到数据</label></div>
+
+    <div class="ok"><b>里程碑</b>：到这里「前端→后端→算法」链路通了，阶段1 验证成功一半。后续接口都是同样的转发套路。</div>
+  </div>
+
+  <div class="section">
+    <h2>Step 1C · 对接剩余接口 <span style="font-weight:400;font-size:12px;color:#9ca3af">（Day 3）</span></h2>
+    <div class="sub">POST 接口要把前端表单/点击事件接到后端，再转发给算法。</div>
+
+    <div class="task"><input type="checkbox" id="c1"><label for="c1">POST /anomaly/detect —— <b>先核对 scaler 文件名！</b></label></div>
+    <div class="warn"><b>避坑</b>：文档说 scaler 文件是 <code>scaler_{equipment_id}.pkl</code>，但实际 <code>output/model_weight/</code> 下只有 <code>scaler.pkl</code>（无设备后缀）。<b>联调归一化前先 <code>ls output/model_weight/</code> 核对实际文件名</b>，按实际加载。</div>
+    <div class="task"><input type="checkbox" id="c2"><label for="c2">POST /traceability/report → 前端点设备时触发，后端转发</label></div>
+    <div class="task"><input type="checkbox" id="c3"><label for="c3">POST /strategy/generate → 溯源结果页底部调，可整段传 analysis_result</label></div>
+    <div class="task"><input type="checkbox" id="c4"><label for="c4">GET /equipment/list → 前端设备下拉框/列表用</label></div>
+    <div class="task"><input type="checkbox" id="c5"><label for="c5">POST /carbon/query → 按层级聚合查询（level/node_id/时间范围）</label></div>
+  </div>
+
+  <div class="section">
+    <h2>关键风险与避坑清单</h2>
+    <div class="warn"><b>1. scaler 文件名不符</b>：文档写 <code>scaler_{id}.pkl</code>，实际是 <code>scaler.pkl</code>。归一化代码按实际文件名写。</div>
+    <div class="warn"><b>2. 模型未训练</b>：<code>output/model_weight/</code> 无 .pth 权重，<code>/anomaly/detect</code> 会返回 <code>threshold_type: "fallback"</code>（统计偏离度）。<b>能联调，但精度低</b>，上线前训练 5 台高耗能设备。</div>
+    <div class="warn"><b>3. 缓存 30 秒</b>：overview/heatmap/realtime 有内存缓存（<code>services._CACHE_TTL=30.0</code>）。改了数据不生效时，等 30s 或重启算法服务。</div>
+    <div class="warn"><b>4. 时间格式</b>：必须 ISO 8601 带 T，如 <code>2026-08-21T14:30:00</code>，否则 422。</div>
+    <div class="warn"><b>5. CORS 开着 '*'</b>：联调期 OK，上线前改白名单（阶段5 做）。</div>
+  </div>
+
+  <div class="section">
+    <h2>阶段1 验收标准</h2>
+    <div class="task"><input type="checkbox" id="v1"><label for="v1">前端 3 个页面（总览/热力图/设备实时）能显示算法数据</label></div>
+    <div class="task"><input type="checkbox" id="v2"><label for="v2">6 个接口全部跑通（Swagger 或前端触发均可）</label></div>
+    <div class="task"><input type="checkbox" id="v3"><label for="v3">算法实际响应字段已记录，与文档差异已标注</label></div>
+    <div class="task"><input type="checkbox" id="v4"><label for="v4">前端→后端→算法整条链路验证通过</label></div>
+    <div class="ok"><b>完成上述 4 项 = 阶段1 达成</b>。之后进入阶段2（数据库+权限）和阶段3（真实数据采集+实时链路），见 <code>backend_integration_checklist.html</code>。</div>
+  </div>
+
+  <footer>执行计划基于文件系统实际检查生成 · 2026-08-30 · 算法负责人：队长（算法）</footer>
+</div>
+
+<script>
+  const ids=[...document.querySelectorAll('input[type=checkbox]')].map(i=>i.id);
+  const KEY='carbon_nextplan_v1';
+  try{const s=JSON.parse(localStorage.getItem(KEY)||'{}');ids.forEach(id=>{if(s[id])document.getElementById(id).checked=true;});}catch(e){}
+  document.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.addEventListener('change',()=>{cb.parentElement.classList.toggle('done',cb.checked);const save={};ids.forEach(id=>save[id]=document.getElementById(id).checked);localStorage.setItem(KEY,JSON.stringify(save));}));
+</script>
+</body>
+</html>

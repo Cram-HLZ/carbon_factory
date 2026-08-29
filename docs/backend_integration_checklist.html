@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>后端联调任务清单 · 碳排AI监测系统</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:#f5f6f8;color:#1f2937;line-height:1.6;padding:24px}
+  .wrap{max-width:920px;margin:0 auto}
+  header{background:linear-gradient(135deg,#0f766e,#10b981);color:#fff;padding:28px 32px;border-radius:14px 14px 0 0;box-shadow:0 4px 14px rgba(15,118,110,.18)}
+  header h1{font-size:22px;font-weight:700;margin-bottom:6px}
+  header p{font-size:13px;opacity:.92}
+  .bar-wrap{margin-top:14px;background:rgba(255,255,255,.25);border-radius:20px;height:8px;overflow:hidden}
+  .bar{height:100%;background:#fff;width:0;transition:width .4s ease;border-radius:20px}
+  .bar-label{font-size:12px;margin-top:6px;opacity:.95}
+  .section{background:#fff;border-radius:12px;margin:18px 0;padding:22px 26px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+  .section h2{font-size:17px;color:#0f766e;border-left:4px solid #10b981;padding-left:10px;margin-bottom:16px}
+  .group{margin-bottom:18px}
+  .group:last-child{margin-bottom:0}
+  .group-title{font-size:14px;font-weight:600;color:#374151;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .group-title .gnum{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;background:#0f766e;color:#fff;border-radius:6px;font-size:12px;font-weight:700}
+  .item{display:flex;align-items:flex-start;gap:10px;padding:7px 10px;border-radius:7px;cursor:pointer;font-size:14px;color:#374151;transition:background .15s}
+  .item:hover{background:#f0fdfa}
+  .item input{margin-top:3px;width:17px;height:17px;accent-color:#10b981;cursor:pointer;flex-shrink:0}
+  .item label{cursor:pointer;flex:1}
+  .item.done label{text-decoration:line-through;color:#9ca3af}
+  .sub{margin-left:27px;font-size:13px;color:#6b7280;margin-top:2px}
+  .hint{font-size:12px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;margin-top:12px}
+  .hint b{color:#92400e}
+  footer{text-align:center;font-size:12px;color:#9ca3af;padding:18px 0 8px}
+  .btn{display:inline-block;font-size:12px;color:#0f766e;background:#ecfdf5;border:1px solid #a7f3d0;padding:5px 12px;border-radius:7px;cursor:pointer;margin-left:10px}
+  .btn:hover{background:#d1fae5}
+  .roles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:8px}
+  .role{background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px}
+  .role h3{font-size:13px;color:#0f766e;margin-bottom:8px}
+  .role ul{list-style:none;font-size:13px;color:#4b5563}
+  .role li{padding:2px 0 2px 14px;position:relative}
+  .role li::before{content:"›";position:absolute;left:0;color:#10b981;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>后端联调任务清单</h1>
+    <p>数字孪生锂电工厂碳排AI监测系统 · 算法服务对接后端 · 共 4 大模块 / 41 项</p>
+    <div class="bar-wrap"><div class="bar" id="bar"></div></div>
+    <div class="bar-label" id="barLabel">进度：0 / 41</div>
+  </header>
+
+  <div class="section">
+    <h2>当前进度快照（基于文件系统实际检查 · 2026-08-30）</h2>
+    <div class="roles">
+      <div class="role" style="border-left:3px solid #10b981">
+        <h3>✅ 算法侧 · 已就绪</h3>
+        <ul>
+          <li>8 接口已实现，main.py 可启动</li>
+          <li>模拟数据 9.4MB 已生成</li>
+          <li>CORS 已配（开发期 '*'）</li>
+          <li>缓存 TTL=30s（services.py L95）</li>
+        </ul>
+      </div>
+      <div class="role" style="border-left:3px solid #ef4444">
+        <h3>❌ 模型训练 · 未做</h3>
+        <ul>
+          <li>无任何 .pth 权重文件</li>
+          <li>anomaly/detect 走 fallback 统计偏离度</li>
+          <li>不影响联调，上线前需训练</li>
+        </ul>
+      </div>
+      <div class="role" style="border-left:3px solid #ef4444">
+        <h3>❌ 后端 · 0 起步</h3>
+        <ul>
+          <li>本仓库无后端代码</li>
+          <li>需另起后端项目从零搭</li>
+          <li>data_loader 读 CSV，待换 DB</li>
+        </ul>
+      </div>
+      <div class="role" style="border-left:3px solid #f59e0b">
+        <h3>⚠️ 联调风险点</h3>
+        <ul>
+          <li>scaler 实际文件名是 scaler.pkl，非文档的 scaler_{id}.pkl</li>
+          <li>归一化前先核对实际文件名</li>
+        </ul>
+      </div>
+    </div>
+    <div class="hint"><b>结论</b>：一个人的真实起点是<b>阶段1（跑通联调）尚未开始</b>。算法服务可立即启动验证，后端需从零搭建。下一步先做阶段1——详见 <code>next_step_plan.html</code>。</div>
+  </div>
+
+  <div class="section">
+    <h2>一、后端基础设施（7 大块）</h2>
+
+    <div class="group">
+      <div class="group-title"><span class="gnum">1</span>数据库设计与搭建</div>
+      <div class="item"><input type="checkbox" id="db1"><label for="db1">设备表（equipment：ID/名称/类型/车间/班组/额定功率）</label></div>
+      <div class="item"><input type="checkbox" id="db2"><label for="db2">时序数据表（功率/温度/振动/负载率/碳排，按分钟入库）</label></div>
+      <div class="item"><input type="checkbox" id="db3"><label for="db3">告警记录表（设备ID/时间/严重度/根因/处理状态）</label></div>
+      <div class="item"><input type="checkbox" id="db4"><label for="db4">方案表（设备ID/方案类型/节能估算/优先级）</label></div>
+      <div class="item"><input type="checkbox" id="db5"><label for="db5">用户表（账号/角色/密码哈希/权限）</label></div>
+    </div>
+
+    <div class="group">
+      <div class="group-title"><span class="gnum">2</span>数据采集接口</div>
+      <div class="item"><input type="checkbox" id="ac1"><label for="ac1">对接 MES/EMS 系统（生产/能耗数据）</label></div>
+      <div class="item"><input type="checkbox" id="ac2"><label for="ac2">对接 PLC / 传感器（实时工况）</label></div>
+      <div class="item"><input type="checkbox" id="ac3"><label for="ac3">采集服务写入数据库（替换算法侧模拟 CSV）</label></div>
+    </div>
+
+    <div class="group">
+      <div class="group-title"><span class="gnum">3</span>用户认证与权限</div>
+      <div class="item"><input type="checkbox" id="au1"><label for="au1">登录接口 + JWT 会话</label></div>
+      <div class="item"><input type="checkbox" id="au2"><label for="au2">角色管理：管理层 / 运维岗 / IT管理员</label></div>
+      <div class="item"><input type="checkbox" id="au3"><label for="au3">权限控制中间件（接口级校验）</label></div>
+    </div>
+
+    <div class="group">
+      <div class="group-title"><span class="gnum">4</span>告警推送</div>
+      <div class="item"><input type="checkbox" id="al1"><label for="al1">WebSocket 实时推送到前端</label></div>
+      <div class="item"><input type="checkbox" id="al2"><label for="al2">移动端消息推送</label></div>
+      <div class="item"><input type="checkbox" id="al3"><label for="al3">邮件告警通知</label></div>
+    </div>
+
+    <div class="group">
+      <div class="group-title"><span class="gnum">5</span>报表生成</div>
+      <div class="item"><input type="checkbox" id="rp1"><label for="rp1">月度碳排报告</label></div>
+      <div class="item"><input type="checkbox" id="rp2"><label for="rp2">设备溯源台账</label></div>
+      <div class="item"><input type="checkbox" id="rp3"><label for="rp3">降碳成效对比表</label></div>
+      <div class="item"><input type="checkbox" id="rp4"><label for="rp4">导出 PDF / Excel</label></div>
+    </div>
+
+    <div class="group">
+      <div class="group-title"><span class="gnum">6</span>历史数据存储与查询</div>
+      <div class="item"><input type="checkbox" id="hs1"><label for="hs1">3 年全量数据归档策略</label></div>
+      <div class="item"><input type="checkbox" id="hs2"><label for="hs2">高效时序查询（按时间范围/设备聚合）</label></div>
+    </div>
+
+    <div class="group">
+      <div class="group-title"><span class="gnum">7</span>系统部署</div>
+      <div class="item"><input type="checkbox" id="dp1"><label for="dp1">服务器环境配置</label></div>
+      <div class="item"><input type="checkbox" id="dp2"><label for="dp2">Nginx 反向代理（前端 → 后端 → 算法 8000）</label></div>
+      <div class="item"><input type="checkbox" id="dp3"><label for="dp3">Docker 容器化（算法服务单独占 8000 端口）</label></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>二、与算法服务联调对接</h2>
+
+    <div class="group">
+      <div class="group-title"><span class="gnum">1</span>联调前准备</div>
+      <div class="item"><input type="checkbox" id="pr1"><label for="pr1">拷贝 scaler_{equipment_id}.pkl 到后端服务（output/model_weight/ 下）</label></div>
+      <div class="item"><input type="checkbox" id="pr2"><label for="pr2">实现归一化加载逻辑（调 /anomaly/detect 前对 sequence_data 做 [0,1] 处理）</label></div>
+      <div class="item"><input type="checkbox" id="pr3"><label for="pr3">配置算法服务地址（http://算法IP:8000/api/v1）</label></div>
+    </div>
+
+    <div class="group">
+      <div class="group-title"><span class="gnum">2</span>接口对接（按优先级）</div>
+      <div class="item"><input type="checkbox" id="api1"><label for="api1">GET /carbon/overview — 厂区总览（首页数据）</label></div>
+      <div class="item"><input type="checkbox" id="api2"><label for="api2">GET /carbon/heatmap — 碳排热力图</label></div>
+      <div class="item"><input type="checkbox" id="api3"><label for="api3">GET /equipment/realtime/{id} — 设备实时数据</label></div>
+      <div class="item"><input type="checkbox" id="api4"><label for="api4">POST /anomaly/detect — 异常检测</label></div>
+      <div class="item"><input type="checkbox" id="api5"><label for="api5">POST /traceability/report — 溯源报告</label></div>
+      <div class="item"><input type="checkbox" id="api6"><label for="api6">POST /strategy/generate — 降碳方案</label></div>
+      <div class="item"><input type="checkbox" id="api7"><label for="api7">GET /equipment/list — 设备列表（可按车间筛选）</label></div>
+      <div class="item"><input type="checkbox" id="api8"><label for="api8">POST /carbon/query — 碳排四级聚合查询</label></div>
+    </div>
+
+    <div class="group">
+      <div class="group-title"><span class="gnum">3</span>实时数据流打通（关键链路）</div>
+      <div class="item"><input type="checkbox" id="fl1"><label for="fl1">后端采集 → 写入数据库</label></div>
+      <div class="item"><input type="checkbox" id="fl2"><label for="fl2">数据库 → 后端调 /anomaly/detect</label></div>
+      <div class="item"><input type="checkbox" id="fl3"><label for="fl3">算法返回异常 → 后端推 WebSocket</label></div>
+      <div class="item"><input type="checkbox" id="fl4"><label for="fl4">前端接收 → 弹窗告警</label></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>三、上线前确认</h2>
+    <div class="item"><input type="checkbox" id="go1"><label for="go1">CORS 改为前端域名白名单（开发期是 '*'）</label></div>
+    <div class="item"><input type="checkbox" id="go2"><label for="go2">5 台高耗能设备训练 LSTM：I-9-01 烘烤炉 / COMP-01 空压机 / CHILL-01 冷水机组 / L-12-01 龙门铣床 / C-3-01 卷绕机</label></div>
+    <div class="item"><input type="checkbox" id="go3"><label for="go3">模拟数据替换为真实数据源（data_loader 读后端库）</label></div>
+    <div class="item"><input type="checkbox" id="go4"><label for="go4">缓存策略确认（高频接口 30s TTL，强实时需清缓存或缩短）</label></div>
+
+    <div class="hint"><b>注意</b>：算法只提供原子能力，多设备聚合 / 报表组合 / 权限过滤等<b>业务组合逻辑放后端</b>。所有接口统一返回 <code>{code, message, data}</code>，500 错误看 <code>data.error</code> 字段。</div>
+  </div>
+
+  <div class="section">
+    <h2>四、单人执行顺序（按依赖排序）<span class="btn" id="resetBtn">重置进度</span></h2>
+    <p style="font-size:13px;color:#6b7280;margin-bottom:12px">一个人做，按阶段推进，每阶段依赖上一阶段。建议工期仅供参考，先用现成模拟数据跑通联调是最快见效的起点。</p>
+    <div class="roles">
+      <div class="role">
+        <h3>阶段1 · 跑通联调（1-2天）</h3>
+        <ul>
+          <li>拷贝 scaler + 配置算法地址</li>
+          <li>按6级优先级对接6接口</li>
+          <li>用现成模拟数据验证（可立即开工）</li>
+        </ul>
+      </div>
+      <div class="role">
+        <h3>阶段2 · 后端基础（2-3天）</h3>
+        <ul>
+          <li>数据库5张表搭建</li>
+          <li>登录 + 三角色权限</li>
+        </ul>
+      </div>
+      <div class="role">
+        <h3>阶段3 · 真实数据链路（3-5天）</h3>
+        <ul>
+          <li>采集 MES/EMS/PLC → 写库</li>
+          <li>实时流：采集→检测→WS→前端</li>
+          <li>告警推送（移动端/邮件）</li>
+        </ul>
+      </div>
+      <div class="role">
+        <h3>阶段4 · 报表与归档（2-3天）</h3>
+        <ul>
+          <li>月度报告+台账+对比表</li>
+          <li>导出 PDF/Excel</li>
+          <li>3年归档 + 时序查询</li>
+        </ul>
+      </div>
+      <div class="role">
+        <h3>阶段5 · 部署收尾（1-2天）</h3>
+        <ul>
+          <li>Nginx反代 + Docker容器化</li>
+          <li>CORS白名单 + 缓存策略</li>
+          <li>协调5台设备训练LSTM</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <footer>基于 docs/algorithm_interface.md 与 README.md 整理 · 勾选状态本地保存 · 算法负责人：队长（算法）</footer>
+</div>
+
+<script>
+  const ids = [...document.querySelectorAll('input[type=checkbox]')].map(i=>i.id);
+  const KEY = 'carbon_integration_checklist';
+  // 读取
+  try{
+    const saved = JSON.parse(localStorage.getItem(KEY)||'{}');
+    ids.forEach(id=>{ if(saved[id]) document.getElementById(id).checked=true; });
+  }catch(e){}
+  function update(){
+    let done=0; const total=ids.length;
+    ids.forEach(id=>{ if(document.getElementById(id).checked){done++; document.getElementById(id).parentElement.classList.add('done');} else {document.getElementById(id).parentElement.classList.remove('done');} });
+    const pct = Math.round(done/total*100);
+    document.getElementById('bar').style.width=pct+'%';
+    document.getElementById('barLabel').textContent='进度：'+done+' / '+total+'（'+pct+'%）';
+    const save={}; ids.forEach(id=>save[id]=document.getElementById(id).checked);
+    localStorage.setItem(KEY, JSON.stringify(save));
+  }
+  document.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.addEventListener('change',update));
+  document.getElementById('resetBtn').addEventListener('click',()=>{ if(confirm('确定重置所有勾选进度？')){ ids.forEach(id=>document.getElementById(id).checked=false); update(); } });
+  update();
+</script>
+</body>
+</html>
