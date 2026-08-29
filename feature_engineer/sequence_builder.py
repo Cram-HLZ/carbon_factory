@@ -199,7 +199,9 @@ class SequenceBuilder:
             X_test_norm = scaler.transform(flat_test).reshape(X_test.shape).astype(np.float32)
 
         if save_path is None:
-            save_path = MODEL_WEIGHT_DIR / 'scaler.pkl'
+            # 注意：训练脚本应显式传 scaler_{equipment_id}.pkl（按设备隔离），
+            # 这里只提供通用兜底名，避免产生与设备混淆的 scaler.pkl 残留
+            save_path = MODEL_WEIGHT_DIR / 'scaler_generic.pkl'
         self.save_scaler(scaler, save_path)
 
         return X_train_norm, X_test_norm, scaler

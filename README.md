@@ -146,6 +146,23 @@ python -m Lstm_model.train --equipment_id COMP-01 --epochs 30
 python -m Lstm_model.train --equipment_id C-3-01 --epochs 30
 ```
 
+### 4.4 阶段1联调验证（推荐先跑这个）
+
+对应执行计划「阶段1 跑通联调」的 Step 1A/1B/1C，两条命令验收：
+
+```bash
+# ① Step 1A：验证算法服务（先启动 python main.py，再跑）
+python test_api.py
+# → 自动验证全部 8 个端点 + 打印「实际响应字段 vs 文档」差异核对
+
+# ② Step 1B/1C：后端→算法链路验收
+python main.py                                        # 终端1：算法 8000
+uvicorn backend.main:app --port 8001                  # 终端2：后端 8001（项目根目录执行）
+python backend/test_backend.py                        # 终端3：链路测试
+```
+
+`backend/` 是给后端同学的脚手架（HTTP 透传转发算法 + 业务组装起点），文件说明见 [backend/\_\_init\_\_.py](backend/__init__.py)。接口实际响应与文档的差异清单见 [docs/algorithm_interface.md](docs/algorithm_interface.md) 第九章。
+
 ---
 
 ## 五、与后端联调

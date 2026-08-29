@@ -465,7 +465,47 @@ const list = await API.get('/equipment/list', { params: { workshop_id: 'WS-01' }
 
 - 当前算法侧仅生成模拟数据，**真实数据接入由后端完成**
 - LSTM 模型未训练时，`/anomaly/detect` 会退化为 `fallback` 统计偏离度（不影响联调）
-- `sequence_data` 必须是归一化后的数据，建议后端把 `output/model_weight/scaler_{equipment_id}.pkl` 拷贝到后端服务，启动时加载
+- `sequence_data` 必须是归一化后的数据，scaler 文件（`output/model_weight/scaler_{equipment_id}.pkl`）**仅在该设备训练后才存在**；当前未训练 → 接口自动 fallback，联调不受影响
 - 高频接口（overview / heatmap / realtime）有 30 秒内存缓存，需要实时数据时让算法侧清缓存或缩短 TTL
 
 如有问题随时找我（队长·算法）。
+
+---
+
+## 九、阶段1联调核对记录（实际响应 vs 文档差异）· 2026-08-30
+
+> 按执行计划（Step 1A）要求，用 `test_api.py` 核对了全部接口的**实际返回字段**，差异如下。
+> **后端按实际字段开发**，本文档其余章节已同步修正；`api_server/schemas.py` 契约也已对齐。
+
+| # | 接口 | 差异点 | 后端处理方式 |
+|---|------|--------|--------------|
+| 1 | `POST /anomaly/detect` | 实际多返回 `equipment_name` / `should_alert` / `threshold_type`（文档原 schema 漏了） | 直接可用；`threshold_type` 取值：`lstm`(已训练) / `fallback`(未训练兜底) / `adaptive` / `fixed` |
+| 2 | `POST /traceability/report` | 实际多返回 `team_id` / `health_score`（0-100 设备健康分） | 直接可用，前端可展示健康分徽标 |
+| 3 | `POST /strategy/generate` | 方案对象无 `target` 字段，实为 `target_equipment`（设备类方案）/ `target_workshop`（车间类方案），另含 `constraints` 等 | 按方案类型取对应字段；schema 已同步 |
+| 4 | `GET /equipment/realtime/{id}` | 无数据时**不报错**，返回占位结构（power=0 等）+ `message` 字段 | 前端判 `message` 存在时展示"暂无数据" |
+| 5 | `POST /carbon/query` | 无数据时返回 `records: []` + `message` | 同上 |
+| 6 | scaler 文件名 | `scaler_{equipment_id}.pkl` **训练后才存在**；此前误提交的 `scaler.pkl` 残留已清理 | 联调前 `ls output/model_weight/` 核对；未训练时无需 scaler，接口自动 fallback |
+| 7 | 缓存行为 | overview / heatmap / realtime 有 30s 内存缓存 | 改数据不生效等 30s；生产可调 `services._CACHE_TTL` |
+
+**核对工具**：项目根目录 `python test_api.py`（算法 8000 起后运行）——末尾自动打印各接口实际顶层字段与本文档的比对结果。
+
+**阶段1联调架构**（新增 `backend/` 脚手架）：
+
+```
+前端 → 后端 8001 (/api/xxx)  →  算法 8000 (/api/v1/xxx)
+       backend/routes.py 透传转发
+       backend/algorithm_client.py 统一超时/错误处理(503兜底)
+```
+
+后端脚手架启动与链路验收：
+
+```bash
+# 终端1：算法服务
+python main.py
+
+# 终端2：后端服务（项目根目录执行）
+uvicorn backend.main:app --port 8001
+
+# 终端3：链路验收（覆盖全部 8 个转发端点）
+python backend/test_backend.py
+```

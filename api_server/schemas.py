@@ -63,14 +63,21 @@ class AnomalyDetectRequest(BaseModel):
 
 
 class AnomalyDetectResponse(BaseModel):
+    """
+    2026-08-30 按实际返回对齐：
+        - 补充 equipment_name / threshold_type / should_alert（接口实际返回，后端直接可用）
+        - threshold_type 取值：lstm(已训练) / fallback(未训练兜底) / adaptive / fixed
+    """
     is_anomaly: bool
     reconstruction_error: float
     threshold: float
     severity: str = Field(..., description='high/medium/low/normal')
     anomaly_score: float
     equipment_id: str
+    equipment_name: Optional[str] = Field(None, description='设备名称，如"电芯烘烤炉"')
     timestamp: datetime
-    should_alert: bool = Field(False, description='是否应该推送告警（冷却后）')
+    threshold_type: str = Field('adaptive', description='阈值来源：lstm/fallback/adaptive/fixed')
+    should_alert: bool = Field(False, description='是否应推送告警（已含10分钟冷却控制）')
 
 
 # ============================================================
@@ -94,9 +101,13 @@ class StrategyRequest(BaseModel):
 
 
 class StrategyItem(BaseModel):
+    """
+    2026-08-30 按实际返回对齐：
+        - 原 target 必填字段拆为 target_equipment（设备方案）/ target_workshop（车间方案）
+        - 补充 workshop_id / equipment_type / equipment_count / constraints 可选字段
+    """
     strategy_type: str = Field(..., description='equipment_maintenance/production_scheduling/process_optimization')
     title: str
-    target: str = Field(..., description='目标设备/车间描述')
     actions: List[str]
     estimated_energy_saving: str = Field(..., description='估算节能量（如 15.2%）')
     estimated_carbon_reduction: str = Field(..., description='估算降碳量（如 23.8 kgCO2/天）')
@@ -104,6 +115,15 @@ class StrategyItem(BaseModel):
     investment: str = Field(..., description='所需投资')
     payback_period: str = Field(..., description='回收期')
     priority: str = Field(..., description='high/medium/low')
+    # 设备类方案字段（equipment_maintenance / process_optimization）
+    target_equipment: Optional[str] = Field(None, description='目标设备ID，如 I-9-01')
+    target_equipment_name: Optional[str] = Field(None, description='目标设备名称')
+    workshop_id: Optional[str] = Field(None, description='所属车间')
+    equipment_type: Optional[str] = Field(None, description='设备类型标识')
+    # 车间类方案字段（production_scheduling）
+    target_workshop: Optional[str] = Field(None, description='目标车间，如 WS-02（电芯化成车间）')
+    equipment_count: Optional[int] = Field(None, description='车间方案涉及的设备数')
+    constraints: Optional[str] = Field(None, description='方案约束条件（如工艺要求）')
 
 
 # ============================================================
