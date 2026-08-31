@@ -26,12 +26,17 @@ import urllib.error
 import urllib.request
 from urllib.parse import urlencode
 from typing import Any, Dict, Optional, Tuple
+from datetime import datetime, timedelta
 
 DEFAULT_BASE = 'http://localhost:8001'   # 后端地址（不是算法的 8000！）
 TIMEOUT = 20
 
-DATA_START = '2026-08-15T00:00:00'
-DATA_END = '2026-08-22T00:00:00'
+# 数据窗口 = 最近 7 天（与 data/generate_sample_data.py 的相对窗口保持一致）
+# 动态计算，避免样本数据改为相对时间后固定日期失效
+_DATA_END = datetime.now()
+_DATA_START = _DATA_END - timedelta(days=7)
+DATA_START = _DATA_START.replace(microsecond=0).isoformat()
+DATA_END = _DATA_END.replace(microsecond=0).isoformat()
 
 
 def http_get(base: str, path: str, params: Optional[Dict] = None) -> Tuple[int, Any]:
@@ -138,7 +143,9 @@ def main():
                    f'records={len(data.get("records") or [])}'))
 
     status, body = http_post(base, '/api/traceability/report', {
-        'equipment_id': 'I-9-01', 'anomaly_time': '2026-08-21T14:30:00', 'hours': 72,
+        'equipment_id': 'I-9-01',
+        'anomaly_time': _DATA_END.replace(microsecond=0).isoformat(),
+        'hours': 72,
     })
     data = body.get('data') or {}
     ok = status == 200 and bool(data.get('root_causes'))

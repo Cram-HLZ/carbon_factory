@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>设备实时 · 碳排AI监测系统</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="app.js"></script>
+<style>
+  body{background:#f5f6f8;font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+  .navbar-brand{font-weight:700}
+  .card{border:none;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+  .card-title{font-size:14px;font-weight:600;color:#374151;padding:14px 16px 0}
+  #loadGauge{height:280px}
+  .metric{padding:18px 20px}
+  .metric .label{font-size:12px;color:#6b7280}
+  .metric .value{font-size:26px;font-weight:700;color:#0f766e}
+  .metric .unit{font-size:12px;color:#9ca3af}
+  .badge-run{background:#10b981}
+  .badge-standby{background:#f59e0b}
+  .badge-stop{background:#6b7280}
+</style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark" style="background:#0f766e">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="#">🌿 数字孪生锂电工厂 · 碳排AI监测</a>
+    <div class="navbar-nav">
+      <a class="nav-link" href="overview.html">厂区总览</a>
+      <a class="nav-link" href="heatmap.html">碳排热力图</a>
+      <a class="nav-link active" href="realtime.html">设备实时</a>
+    </div>
+    <div class="d-flex align-items-center gap-3 ms-auto">
+      <span class="navbar-text small" id="connBadge">后端: 8001</span>
+      <span class="navbar-text small d-flex align-items-center gap-2" id="userBar"></span>
+    </div>
+  </div>
+</nav>
+
+<div class="container-fluid py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <h5 class="mb-0">设备实时监测</h5>
+    <div class="d-flex align-items-center gap-2">
+      <select class="form-select form-select-sm" id="equipSel" style="min-width:220px"></select>
+      <div class="form-check form-switch mb-0">
+        <input class="form-check-input" type="checkbox" id="autoRefresh" checked>
+        <label class="form-check-label small" for="autoRefresh">自动刷新(10s)</label>
+      </div>
+      <button class="btn btn-sm btn-success" onclick="load()">立即刷新</button>
+    </div>
+  </div>
+
+  <div class="alert alert-warning d-none" id="emptyAlert"></div>
+
+  <!-- 设备信息 -->
+  <div class="card mb-3" style="padding:14px 20px">
+    <div class="d-flex flex-wrap align-items-center gap-3">
+      <div>
+        <span class="fs-5 fw-bold" id="infoName">—</span>
+        <span class="badge bg-secondary ms-2" id="infoId">—</span>
+      </div>
+      <span class="text-secondary small" id="infoType">—</span>
+      <span class="text-secondary small" id="infoWorkshop">—</span>
+      <span class="text-secondary small" id="infoTime">—</span>
+      <span class="ms-auto badge badge-run" id="infoStatus">—</span>
+    </div>
+  </div>
+
+  <!-- 指标卡 + 仪表盘 -->
+  <div class="row g-3">
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-title">负载率</div>
+        <div id="loadGauge"></div>
+      </div>
+    </div>
+    <div class="col-md-8">
+      <div class="row g-3 h-100">
+        <div class="col-6"><div class="card metric"><div class="label">实时功率</div><div class="value" id="mPower">—</div><div class="unit">kW</div></div></div>
+        <div class="col-6"><div class="card metric"><div class="label">瞬时碳排</div><div class="value" id="mCarbon">—</div><div class="unit">kgCO₂</div></div></div>
+        <div class="col-6"><div class="card metric"><div class="label">设备温度</div><div class="value" id="mTemp">—</div><div class="unit">℃</div></div></div>
+        <div class="col-6"><div class="card metric"><div class="label">采样时间</div><div class="value" style="font-size:18px" id="mTime">—</div><div class="unit">实时数据</div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const BASE = 'http://localhost:8001/api';
+
+// 设备类型 → 中文名
+const TYPE_NAMES = {
+  appearance_inspector: '电芯外观检测机', dimension_inspector: '电芯尺寸检测机',
+  winding_machine: '电芯卷绕机', formation_cabinet: '电芯化成柜', sorting_machine: '电芯分选机',
+  conveyor_line: '电芯输送流水线', baking_oven: '电芯烘烤炉', agv: '自动导引运输车AGV',
+  cnc_milling_machine: '数控龙门铣床', compressor: '空压机', cooling_fan: '冷却风机', chiller: '冷水机组',
+};
+const WORKSHOPS = {
+  'WS-01': '电芯制备车间', 'WS-02': '电芯化成车间', 'WS-03': '电芯检测分选车间',
+  'WS-04': '模具加工车间', 'WS-05': '物流动力区',
+};
+const STATUS = { 0: '停机', 1: '运行', 2: '待机' };
+const STATUS_CLS = { 0: 'badge-stop', 1: 'badge-run', 2: 'badge-standby' };
+
+const gauge = echarts.init(document.getElementById('loadGauge'));
+window.addEventListener('resize', () => gauge.resize());
+
+function showError(msg) {
+  const el = document.getElementById('emptyAlert');
+  el.textContent = '⚠ ' + msg;
+  el.classList.remove('d-none', 'alert-warning');
+  el.classList.add('alert-danger');
+}
+
+let equipList = [];
+async function loadEquipmentList() {
+  try {
+    const resp = await fetch(BASE + '/equipment/list');
+    const json = await resp.json();
+    if (json.code !== 200) throw new Error(json.message);
+    equipList = (json.data && json.data.items) || [];
+    const sel = document.getElementById('equipSel');
+    sel.innerHTML = equipList.map(e =>
+      `<option value="${e.equipment_id}">${e.equipment_name || e.equipment_id}（${e.equipment_id}）</option>`
+    ).join('');
+    // 默认选中高耗能代表设备 I-9-01（烘烤炉）
+    if (equipList.some(e => e.equipment_id === 'I-9-01')) sel.value = 'I-9-01';
+    load();
+  } catch (e) {
+    showError('获取设备列表失败：' + e.message);
+  }
+}
+
+function fmt(v) {
+  return Number(v).toLocaleString('zh-CN', { maximumFractionDigits: 2 });
+}
+
+async function load() {
+  document.getElementById('emptyAlert').classList.add('d-none');
+  const eqId = document.getElementById('equipSel').value;
+  if (!eqId) return;
+  try {
+    const resp = await fetch(`${BASE}/equipment/realtime/${encodeURIComponent(eqId)}`);
+    const json = await resp.json();
+    if (json.code === 503) { showError('算法服务未启动：' + (json.message || '')); return; }
+    if (json.code !== 200 && json.code != null) { showError(json.message || ('code=' + json.code)); return; }
+    const d = json.data || {};
+    render(d);
+    if (d.message) {
+      const el = document.getElementById('emptyAlert');
+      el.textContent = '提示：' + d.message;
+      el.classList.remove('d-none', 'alert-danger');
+      el.classList.add('alert-warning');
+    }
+    document.getElementById('connBadge').textContent = '已连接 · 实时';
+    document.getElementById('connBadge').className = 'navbar-text small text-success';
+  } catch (e) {
+    showError('无法连接后端 8001：' + e.message);
+    document.getElementById('connBadge').textContent = '后端未连接';
+    document.getElementById('connBadge').className = 'navbar-text small text-danger';
+  }
+}
+
+function render(d) {
+  document.getElementById('infoName').textContent = d.equipment_name || d.equipment_id;
+  document.getElementById('infoId').textContent = d.equipment_id;
+  document.getElementById('infoType').textContent = '类型：' + (TYPE_NAMES[d.equipment_type] || d.equipment_type || '—');
+  document.getElementById('infoWorkshop').textContent = '车间：' + (WORKSHOPS[d.workshop_id] || d.workshop_id || '—');
+  document.getElementById('infoTime').textContent = '数据时间：' + (d.timestamp || '—');
+
+  const s = d.status;
+  const badge = document.getElementById('infoStatus');
+  badge.textContent = STATUS[s] != null ? STATUS[s] : '未知';
+  badge.className = 'ms-auto badge ' + (STATUS_CLS[s] || 'bg-secondary');
+
+  document.getElementById('mPower').textContent = fmt(d.power);
+  document.getElementById('mCarbon').textContent = fmt(d.carbon_emission);
+  document.getElementById('mTemp').textContent = fmt(d.temperature);
+  document.getElementById('mTime').textContent = (d.timestamp || '').replace('T', ' ');
+
+  const rate = (d.load_rate || 0) * 100;
+  gauge.setOption({
+    series: [{
+      type: 'gauge', min: 0, max: 120, splitNumber: 6,
+      progress: { show: true, width: 18, itemStyle: { color: '#10b981' } },
+      axisLine: { lineStyle: { width: 18 } },
+      axisLabel: { formatter: '{value}%' },
+      pointer: { width: 4 },
+      detail: { formatter: '{value}%', fontSize: 26, fontWeight: 700, offsetCenter: [0, '70%'] },
+      data: [{ value: +rate.toFixed(1), name: '负载率' }],
+    }],
+  }, true);
+}
+
+// 下拉切换
+document.getElementById('equipSel').addEventListener('change', load);
+// 自动刷新
+setInterval(() => {
+  if (document.getElementById('autoRefresh').checked) load();
+}, 10000);
+
+loadEquipmentList();
+</script>
+</body>
+</html>

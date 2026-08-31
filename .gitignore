@@ -14,6 +14,11 @@ __pycache__/
 *.pyc
 *.pth
 
+# ===== SQLite 数据库文件（本地生成，不上传）=====
+*.db
+*.sqlite
+*.sqlite3
+
 # ===== VSCode本地个人配置（注意！！不要把.vscode写进来！！） =====
 # .vscode 我们要提交！因为里面放团队统一的settings、extensions.json，所有人共用
 # 个人电脑生成的 .vscode/.cache 这种才忽略，我们这里不用管

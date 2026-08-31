@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>登录 · 碳排AI监测系统</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+<style>
+  body{min-height:100vh;display:flex;align-items:center;justify-content:center;
+       background:linear-gradient(135deg,#0f766e,#10b981);
+       font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+  .card{border:none;border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,.18);width:100%;max-width:420px}
+  .brand{font-weight:700;color:#0f766e}
+  .nav-tabs .nav-link{color:#0f766e;font-weight:600}
+  .nav-tabs .nav-link.active{color:#0f766e}
+  .toggle-pwd{color:#6b7280}
+</style>
+</head>
+<body>
+<div class="card p-4">
+  <div class="text-center mb-3">
+    <div class="fs-4 brand">🌿 数字孪生锂电工厂</div>
+    <div class="text-secondary small">碳排AI监测系统</div>
+  </div>
+
+  <ul class="nav nav-tabs mb-3" id="authTab" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="login-tab" data-bs-toggle="tab" data-bs-target="#loginPane" type="button" role="tab">登 录</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="register-tab" data-bs-toggle="tab" data-bs-target="#registerPane" type="button" role="tab">注 册</button>
+    </li>
+  </ul>
+
+  <div class="tab-content">
+    <!-- 登录 -->
+    <div class="tab-pane fade show active" id="loginPane" role="tabpanel">
+      <div class="alert alert-danger py-2 small d-none" id="err"></div>
+      <div class="mb-3">
+        <label class="form-label small">账号</label>
+        <input class="form-control" id="account" placeholder="请输入账号" autocomplete="username">
+      </div>
+      <div class="mb-4">
+        <label class="form-label small">密码</label>
+        <div class="input-group">
+          <input class="form-control" type="password" id="password" placeholder="请输入密码" autocomplete="current-password">
+          <button class="btn btn-outline-secondary toggle-pwd" type="button" id="toggleLoginPwd" onclick="togglePwd('password', this)">显示</button>
+        </div>
+      </div>
+      <button class="btn w-100 text-white" style="background:#0f766e" id="loginBtn" onclick="doLogin()">登 录</button>
+      <div class="text-center text-secondary small mt-3">默认账号：admin / manager / operator</div>
+    </div>
+
+    <!-- 注册 -->
+    <div class="tab-pane fade" id="registerPane" role="tabpanel">
+      <div class="alert alert-danger py-2 small d-none" id="errReg"></div>
+      <div class="mb-3">
+        <label class="form-label small">账号</label>
+        <input class="form-control" id="regAccount" placeholder="3-64 位，用于登录" autocomplete="username">
+      </div>
+      <div class="mb-3">
+        <label class="form-label small">密码</label>
+        <div class="input-group">
+          <input class="form-control" type="password" id="regPassword" placeholder="至少 6 位" autocomplete="new-password">
+          <button class="btn btn-outline-secondary toggle-pwd" type="button" onclick="togglePwd('regPassword', this)">显示</button>
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="form-label small">确认密码</label>
+        <div class="input-group">
+          <input class="form-control" type="password" id="regPassword2" placeholder="再次输入密码" autocomplete="new-password">
+          <button class="btn btn-outline-secondary toggle-pwd" type="button" onclick="togglePwd('regPassword2', this)">显示</button>
+        </div>
+      </div>
+      <button class="btn w-100 text-white" style="background:#10b981" id="regBtn" onclick="doRegister()">注 册</button>
+      <div class="text-secondary small mt-3">注册账号默认为「运维岗」，可查看设备与告警</div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="app.js"></script>
+<script>
+// 已登录则直接进入总览
+if (Auth.isLogin()) location.href = 'overview.html';
+
+function showErr(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.classList.remove('d-none');
+}
+function hideErr(id) {
+  document.getElementById(id).classList.add('d-none');
+}
+
+// 密码明文 / 密文切换
+function togglePwd(inputId, btn) {
+  const inp = document.getElementById(inputId);
+  const show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  btn.textContent = show ? '隐藏' : '显示';
+}
+
+async function doLogin() {
+  hideErr('err');
+  const account = document.getElementById('account').value.trim();
+  const password = document.getElementById('password').value;
+  if (!account || !password) { showErr('err', '请输入账号和密码'); return; }
+
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = true; btn.textContent = '登录中…';
+  try {
+    const resp = await fetch(API_BASE + '/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ account, password }),
+    });
+    const json = await resp.json();
+    if (resp.status !== 200 || !json.access_token) {
+      throw new Error(json.detail || json.message || '登录失败');
+    }
+    Auth.setSession(json.access_token, json.user);
+    location.href = 'overview.html';
+  } catch (e) {
+    showErr('err', e.message || '登录失败，请检查后端服务');
+  } finally {
+    btn.disabled = false; btn.textContent = '登 录';
+  }
+}
+
+async function doRegister() {
+  hideErr('errReg');
+  const account = document.getElementById('regAccount').value.trim();
+  const password = document.getElementById('regPassword').value;
+  const password2 = document.getElementById('regPassword2').value;
+  if (account.length < 3) { showErr('errReg', '账号至少 3 位'); return; }
+  if (password.length < 6) { showErr('errReg', '密码至少 6 位'); return; }
+  if (password !== password2) { showErr('errReg', '两次输入的密码不一致'); return; }
+
+  const btn = document.getElementById('regBtn');
+  btn.disabled = true; btn.textContent = '注册中…';
+  try {
+    const resp = await fetch(API_BASE + '/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ account, password }),
+    });
+    const json = await resp.json();
+    if (resp.status !== 201 || !json.access_token) {
+      throw new Error(json.detail || json.message || '注册失败');
+    }
+    Auth.setSession(json.access_token, json.user);
+    location.href = 'overview.html';
+  } catch (e) {
+    showErr('errReg', e.message || '注册失败，请检查后端服务');
+  } finally {
+    btn.disabled = false; btn.textContent = '注 册';
+  }
+}
+
+// 回车提交
+document.getElementById('password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+document.getElementById('regPassword2').addEventListener('keydown', e => { if (e.key === 'Enter') doRegister(); });
+</script>
+</body>
+</html>

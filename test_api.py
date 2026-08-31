@@ -31,13 +31,17 @@ import urllib.error
 import urllib.request
 from urllib.parse import urlencode
 from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime, timedelta
 
 DEFAULT_BASE = 'http://localhost:8000'
 TIMEOUT = 20
 
-# 模拟数据的时间范围（data/generate_sample_data.py 生成的是 2026-08-15 ~ 2026-08-21）
-DATA_START = '2026-08-15T00:00:00'
-DATA_END = '2026-08-22T00:00:00'
+# 数据窗口 = 最近 7 天（与 data/generate_sample_data.py 的相对窗口保持一致）
+# 动态计算，避免样本数据改为相对时间后固定日期失效
+_DATA_END = datetime.now()
+_DATA_START = _DATA_END - timedelta(days=7)
+DATA_START = _DATA_START.replace(microsecond=0).isoformat()
+DATA_END = _DATA_END.replace(microsecond=0).isoformat()
 
 # 各接口期望出现的顶层 data 字段（用于「实际 vs 文档」粗核对）
 # 维护约定：接口字段变更时同步更新这里 + docs/algorithm_interface.md 第九章
@@ -187,7 +191,7 @@ def check_anomaly(base) -> Tuple[str, bool, str]:
 def check_traceability(base) -> Tuple[str, bool, str]:
     payload = {
         'equipment_id': 'I-9-01',
-        'anomaly_time': '2026-08-21T14:30:00',
+        'anomaly_time': _DATA_END.replace(microsecond=0).isoformat(),
         'hours': 72,
     }
     status, body = http_post(base, '/api/v1/traceability/report', payload)
@@ -288,7 +292,7 @@ def main():
         ('/anomaly/detect', http_post(base, '/api/v1/anomaly/detect',
                                       {'equipment_id': 'I-9-01', 'sequence_data': make_random_sequence()})[1].get('data') or {}),
         ('/traceability/report', http_post(base, '/api/v1/traceability/report',
-                                           {'equipment_id': 'I-9-01', 'anomaly_time': '2026-08-21T14:30:00'})[1].get('data') or {}),
+                                           {'equipment_id': 'I-9-01', 'anomaly_time': _DATA_END.replace(microsecond=0).isoformat()})[1].get('data') or {}),
         ('/strategy/generate', http_post(base, '/api/v1/strategy/generate',
                                          {'equipment_id': 'I-9-01'})[1].get('data') or {}),
         ('/carbon/query', http_post(base, '/api/v1/carbon/query',

@@ -18,6 +18,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.routes import router as backend_router
+from backend.ingestion import router as ingestion_router
+from backend.auth import router as auth_router
 
 app = FastAPI(
     title='碳排监测系统 - 后端服务（阶段1脚手架）',
@@ -40,6 +42,10 @@ app.add_middleware(
 
 # 挂载后端路由（前缀 /api）
 app.include_router(backend_router)
+# 挂载数据采集路由（MES/EMS/PLC 入站 + 模拟采集）
+app.include_router(ingestion_router)
+# 挂载认证与角色管理路由（登录 / 权限 / 用户管理）
+app.include_router(auth_router)
 
 
 @app.get('/', summary='后端根信息')

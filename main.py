@@ -1,17 +1,21 @@
 """
-main —— FastAPI 应用入口
+main —— 算法服务应用入口 + 全站一键启动
 
-启动命令：
-    uvicorn main:app --reload --host 0.0.0.0 --port 8000
-或直接：
-    python main.py
+【单独启动算法服务】
+    uvicorn main:app --host 0.0.0.0 --port 8000
+    访问：http://localhost:8000/docs
 
-启动后访问：
-    http://localhost:8000/docs          Swagger UI（在线测试所有接口）
-    http://localhost:8000/health        健康检查
-    http://localhost:8000/api/v1/...    算法接口
+【一键启动整个网站】（算法 8000 + 后端 8001 + 前端静态站 8003）
+    在项目根目录执行：
+        python main.py
+    推荐用项目虚拟环境运行（避免系统 Python 缺依赖）：
+        ./env/Scripts/python.exe main.py
+    启动后访问：
+        http://localhost:8003/login.html   前端登录页
+        http://localhost:8001/docs         后端接口文档
+        http://localhost:8000/docs         算法接口文档
 
-后端同学：本服务监听 8000 端口，后端通过 HTTP 调用。
+后端同学：算法服务监听 8000 端口，后端通过 HTTP 调用。
 """
 
 from __future__ import annotations
@@ -68,10 +72,63 @@ async def health_check():
 
 
 if __name__ == '__main__':
-    import uvicorn
-    uvicorn.run(
-        'main:app',
-        host=API_CONFIG['host'],
-        port=API_CONFIG['port'],
-        reload=API_CONFIG['reload'],
-    )
+    # ============================================================
+    # 一键启动整个网站：算法服务(8000) + 后端服务(8001) + 前端静态站(8003)
+    # 在项目根目录执行：  python main.py
+    # 推荐：              ./env/Scripts/python.exe main.py
+    # 单独启动算法服务仍可用：  uvicorn main:app --port 8000
+    # ============================================================
+    import signal
+    import subprocess
+    import sys
+    import time
+    from pathlib import Path
+
+    _BASE = Path(__file__).resolve().parent
+    _ENV_PY = _BASE / 'env' / 'Scripts' / 'python.exe'
+    PY = str(_ENV_PY) if _ENV_PY.exists() else sys.executable
+
+    # (名称, 启动命令) —— 端口集中在此修改
+    SERVICES = [
+        ('算法服务(8000)', [PY, '-m', 'uvicorn', 'main:app', '--host', '0.0.0.0', '--port', '8000']),
+        ('后端服务(8001)', [PY, '-m', 'uvicorn', 'backend.main:app', '--host', '0.0.0.0', '--port', '8001']),
+        ('前端静态站(8003)', [PY, '-m', 'http.server', '8003', '--directory', 'frontend']),
+    ]
+
+    _procs = []
+
+    def _stop(*_args):
+        print('\n正在停止全部服务……')
+        for _p in _procs:
+            try:
+                _p.terminate()
+            except Exception:
+                pass
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, _stop)
+    try:
+        signal.signal(signal.SIGTERM, _stop)
+    except Exception:
+        pass
+
+    print('=' * 62)
+    print('  数字孪生锂电工厂 · 碳排AI监测系统 —— 一键启动')
+    print('=' * 62)
+    for _name, _cmd in SERVICES:
+        print(f'  [启动] {_name}')
+        _procs.append(subprocess.Popen(_cmd, cwd=str(_BASE)))
+        time.sleep(0.6)
+
+    print('-' * 62)
+    print('  前端页面   http://localhost:8003/login.html')
+    print('  后端接口   http://localhost:8001/docs')
+    print('  算法接口   http://localhost:8000/docs')
+    print('  按 Ctrl+C 停止全部服务')
+    print('=' * 62)
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        _stop()

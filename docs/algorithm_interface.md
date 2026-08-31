@@ -8,30 +8,30 @@
 
 ## 一、服务信息
 
-| 项目 | 值 |
-|------|------|
-| 服务名称 | 数字孪生锂电工厂碳排AI监测算法服务 |
-| 版本 | 1.0.0 |
-| 服务地址 | `http://<算法服务器IP>:8000` |
-| Swagger UI | `http://<IP>:8000/docs` （可在线测试） |
-| 健康检查 | `GET http://<IP>:8000/health` |
-| API 前缀 | `/api/v1` |
-| 跨域策略 | 开发期 `*`，生产部署建议改为前端域名白名单 |
+| 项目       | 值                                         |
+| ---------- | ------------------------------------------ |
+| 服务名称   | 数字孪生锂电工厂碳排AI监测算法服务         |
+| 版本       | 1.0.0                                      |
+| 服务地址   | `http://<算法服务器IP>:8000`               |
+| Swagger UI | `http://<IP>:8000/docs` （可在线测试）     |
+| 健康检查   | `GET http://<IP>:8000/health`              |
+| API 前缀   | `/api/v1`                                  |
+| 跨域策略   | 开发期 `*`，生产部署建议改为前端域名白名单 |
 
 ---
 
 ## 二、数据格式约定
 
-| 项目 | 格式 / 单位 |
-|------|-------------|
+| 项目     | 格式 / 单位                        |
+| -------- | ---------------------------------- |
 | 时间格式 | ISO 8601，如 `2026-08-21T14:30:00` |
-| 碳排单位 | kgCO2（千克二氧化碳） |
-| 功率单位 | kW（千瓦） |
-| 能耗单位 | kWh（千瓦时） |
-| 温度单位 | ℃（摄氏度） |
-| 振动单位 | mm/s |
-| 负载率 | 0-1 小数 |
-| 设备ID | 见下方设备编码规则 |
+| 碳排单位 | kgCO2（千克二氧化碳）              |
+| 功率单位 | kW（千瓦）                         |
+| 能耗单位 | kWh（千瓦时）                      |
+| 温度单位 | ℃（摄氏度）                        |
+| 振动单位 | mm/s                               |
+| 负载率   | 0-1 小数                           |
+| 设备ID   | 见下方设备编码规则                 |
 
 ### 设备编码规则
 
@@ -53,40 +53,40 @@
 
 ```json
 {
-  "level": "workshop",
-  "node_id": "WS-01",
-  "start_time": "2026-08-15T00:00:00",
-  "end_time": "2026-08-22T00:00:00"
+    "level": "workshop",
+    "node_id": "WS-01",
+    "start_time": "2026-08-15T00:00:00",
+    "end_time": "2026-08-22T00:00:00"
 }
 ```
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| level | string | 是 | 聚合层级：`factory` / `workshop` / `equipment` / `team` |
-| node_id | string | 否 | 节点ID；`level=factory` 时忽略 |
-| start_time | datetime | 是 | 起始时间（ISO 8601） |
-| end_time | datetime | 是 | 结束时间（ISO 8601） |
+| 字段       | 类型     | 必填 | 说明                                                    |
+| ---------- | -------- | ---- | ------------------------------------------------------- |
+| level      | string   | 是   | 聚合层级：`factory` / `workshop` / `equipment` / `team` |
+| node_id    | string   | 否   | 节点ID；`level=factory` 时忽略                          |
+| start_time | datetime | 是   | 起始时间（ISO 8601）                                    |
+| end_time   | datetime | 是   | 结束时间（ISO 8601）                                    |
 
 **响应体**
 
 ```json
 {
-  "code": 200,
-  "message": "success",
-  "data": {
-    "level": "workshop",
-    "node_id": "WS-01",
-    "records": [
-      {
-        "workshop_id": "WS-01",
-        "carbon_emission": 1234.56,
-        "energy_consumption": 2125.83,
-        "equipment_count": 17,
-        "workshop_name": "电芯制备车间"
-      }
-    ],
-    "total_emission": 1234.56
-  }
+    "code": 200,
+    "message": "success",
+    "data": {
+        "level": "workshop",
+        "node_id": "WS-01",
+        "records": [
+            {
+                "workshop_id": "WS-01",
+                "carbon_emission": 1234.56,
+                "energy_consumption": 2125.83,
+                "equipment_count": 17,
+                "workshop_name": "电芯制备车间"
+            }
+        ],
+        "total_emission": 1234.56
+    }
 }
 ```
 
@@ -100,15 +100,31 @@
 
 ```json
 {
-  "code": 200,
-  "data": {
-    "total_emission": 12345.67,
-    "total_energy": 21267.34,
-    "by_workshop": [{"workshop_id": "WS-01", "carbon_emission": 1234.56, "...": "..."}],
-    "by_team": [{"team_id": "TEAM-A", "carbon_emission": 8000.0, "...": "..."}],
-    "by_equipment_top": [{"equipment_id": "I-9-01", "carbon_emission": 2000.0, "...": "..."}],
-    "hourly_trend": [{"timestamp": "2026-08-15T00:00:00", "carbon_emission": 12.5, "energy_consumption": 21.5}]
-  }
+    "code": 200,
+    "data": {
+        "total_emission": 12345.67,
+        "total_energy": 21267.34,
+        "by_workshop": [
+            { "workshop_id": "WS-01", "carbon_emission": 1234.56, "...": "..." }
+        ],
+        "by_team": [
+            { "team_id": "TEAM-A", "carbon_emission": 8000.0, "...": "..." }
+        ],
+        "by_equipment_top": [
+            {
+                "equipment_id": "I-9-01",
+                "carbon_emission": 2000.0,
+                "...": "..."
+            }
+        ],
+        "hourly_trend": [
+            {
+                "timestamp": "2026-08-15T00:00:00",
+                "carbon_emission": 12.5,
+                "energy_consumption": 21.5
+            }
+        ]
+    }
 }
 ```
 
@@ -118,30 +134,30 @@
 
 **Query 参数**
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
+| 字段       | 类型     | 说明     |
+| ---------- | -------- | -------- |
 | start_time | datetime | 起始时间 |
-| end_time | datetime | 结束时间 |
+| end_time   | datetime | 结束时间 |
 
 **响应体**
 
 ```json
 {
-  "code": 200,
-  "data": {
-    "records": [
-      {
-        "equipment_id": "I-9-01",
-        "equipment_name": "电芯烘烤炉",
-        "workshop_id": "WS-01",
-        "carbon_emission": 2345.67,
-        "power_mean": 42.3,
-        "runtime": 10080,
-        "equipment_type": "baking_oven"
-      }
-    ],
-    "count": 78
-  }
+    "code": 200,
+    "data": {
+        "records": [
+            {
+                "equipment_id": "I-9-01",
+                "equipment_name": "电芯烘烤炉",
+                "workshop_id": "WS-01",
+                "carbon_emission": 2345.67,
+                "power_mean": 42.3,
+                "runtime": 10080,
+                "equipment_type": "baking_oven"
+            }
+        ],
+        "count": 78
+    }
 }
 ```
 
@@ -157,12 +173,12 @@
 
 ```json
 {
-  "equipment_id": "I-9-01",
-  "sequence_data": [
-    [0.78, 35.4, 0.59, 122.5, 0.45, 0.34, 0.02, 6800.5],
-    [0.80, 36.1, 0.60, 123.0, 0.46, 0.35, 0.01, 6800.52],
-    "...(共60行，每行8维)"
-  ]
+    "equipment_id": "I-9-01",
+    "sequence_data": [
+        [0.78, 35.4, 0.59, 122.5, 0.45, 0.34, 0.02, 6800.5],
+        [0.8, 36.1, 0.6, 123.0, 0.46, 0.35, 0.01, 6800.52],
+        "...(共60行，每行8维)"
+    ]
 }
 ```
 
@@ -174,29 +190,29 @@
 
 ```json
 {
-  "code": 200,
-  "data": {
-    "is_anomaly": true,
-    "reconstruction_error": 0.345,
-    "threshold": 0.28,
-    "threshold_type": "lstm",
-    "anomaly_score": 1.232,
-    "equipment_id": "I-9-01",
-    "equipment_name": "电芯烘烤炉",
-    "timestamp": "2026-08-21T14:30:00",
-    "severity": "medium",
-    "should_alert": true
-  }
+    "code": 200,
+    "data": {
+        "is_anomaly": true,
+        "reconstruction_error": 0.345,
+        "threshold": 0.28,
+        "threshold_type": "lstm",
+        "anomaly_score": 1.232,
+        "equipment_id": "I-9-01",
+        "equipment_name": "电芯烘烤炉",
+        "timestamp": "2026-08-21T14:30:00",
+        "severity": "medium",
+        "should_alert": true
+    }
 }
 ```
 
 **严重程度分级**：`score = error / threshold`
 
-| 分级 | 阈值范围 |
-|------|---------|
-| high | score > 2.0 |
+| 分级   | 阈值范围    |
+| ------ | ----------- |
+| high   | score > 2.0 |
 | medium | score > 1.5 |
-| low | score > 1.0 |
+| low    | score > 1.0 |
 | normal | score ≤ 1.0 |
 
 > **告警冷却**：同一设备 10 分钟内（`alert_cooldown_seconds=600`）只告警一次，避免频繁弹窗。
@@ -221,9 +237,9 @@
 
 ```json
 {
-  "equipment_id": "I-9-01",
-  "anomaly_time": "2026-08-21T14:30:00",
-  "hours": 72
+    "equipment_id": "I-9-01",
+    "anomaly_time": "2026-08-21T14:30:00",
+    "hours": 72
 }
 ```
 
@@ -231,25 +247,35 @@
 
 ```json
 {
-  "code": 200,
-  "data": {
-    "equipment_id": "I-9-01",
-    "equipment_name": "电芯烘烤炉",
-    "equipment_type": "baking_oven",
-    "workshop_id": "WS-01",
-    "team_id": "TEAM-A",
-    "anomaly_time": "2026-08-21 14:30:00",
-    "carbon_emission": 26.2,
-    "baseline_emission": 18.5,
-    "excess_emission": 7.7,
-    "root_causes": [
-      {"cause": "温控异常-保温温度偏高", "confidence": 0.88, "detail": "..."},
-      {"cause": "升温时间过长", "confidence": 0.72, "detail": "..."}
-    ],
-    "history_72h_summary": {"avg_load": 0.78, "avg_emission": 21.3, "runtime": 71.5, "avg_temp": 125.6, "temp_deviation": 5.6},
-    "recommendation": "建议校准温度传感器，检查保温层密封情况，优化升温曲线...",
-    "health_score": 85.5
-  }
+    "code": 200,
+    "data": {
+        "equipment_id": "I-9-01",
+        "equipment_name": "电芯烘烤炉",
+        "equipment_type": "baking_oven",
+        "workshop_id": "WS-01",
+        "team_id": "TEAM-A",
+        "anomaly_time": "2026-08-21 14:30:00",
+        "carbon_emission": 26.2,
+        "baseline_emission": 18.5,
+        "excess_emission": 7.7,
+        "root_causes": [
+            {
+                "cause": "温控异常-保温温度偏高",
+                "confidence": 0.88,
+                "detail": "..."
+            },
+            { "cause": "升温时间过长", "confidence": 0.72, "detail": "..." }
+        ],
+        "history_72h_summary": {
+            "avg_load": 0.78,
+            "avg_emission": 21.3,
+            "runtime": 71.5,
+            "avg_temp": 125.6,
+            "temp_deviation": 5.6
+        },
+        "recommendation": "建议校准温度传感器，检查保温层密封情况，优化升温曲线...",
+        "health_score": 85.5
+    }
 }
 ```
 
@@ -263,8 +289,8 @@
 
 ```json
 {
-  "equipment_id": "I-9-01",
-  "analysis_result": null
+    "equipment_id": "I-9-01",
+    "analysis_result": null
 }
 ```
 
@@ -274,27 +300,27 @@
 
 ```json
 {
-  "code": 200,
-  "data": {
-    "equipment_id": "I-9-01",
-    "strategies": [
-      {
-        "strategy_type": "equipment_maintenance",
-        "title": "电芯烘烤炉温控校准与保温层维护",
-        "target_equipment": "I-9-01",
-        "actions": ["校准温度传感器...", "检查炉门密封与保温层..."],
-        "estimated_energy_saving": "15.2%",
-        "estimated_carbon_reduction": "23.8 kgCO2/天",
-        "estimated_cost_saving": "¥6,800/月",
-        "investment": "¥2,000（传感器校准+密封条更换）",
-        "payback_period": "0.3个月",
-        "priority": "high"
-      },
-      {"strategy_type": "production_scheduling", "...": "..."},
-      {"strategy_type": "process_optimization", "...": "..."}
-    ],
-    "count": 3
-  }
+    "code": 200,
+    "data": {
+        "equipment_id": "I-9-01",
+        "strategies": [
+            {
+                "strategy_type": "equipment_maintenance",
+                "title": "电芯烘烤炉温控校准与保温层维护",
+                "target_equipment": "I-9-01",
+                "actions": ["校准温度传感器...", "检查炉门密封与保温层..."],
+                "estimated_energy_saving": "15.2%",
+                "estimated_carbon_reduction": "23.8 kgCO2/天",
+                "estimated_cost_saving": "¥6,800/月",
+                "investment": "¥2,000（传感器校准+密封条更换）",
+                "payback_period": "0.3个月",
+                "priority": "high"
+            },
+            { "strategy_type": "production_scheduling", "...": "..." },
+            { "strategy_type": "process_optimization", "...": "..." }
+        ],
+        "count": 3
+    }
 }
 ```
 
@@ -312,20 +338,20 @@
 
 ```json
 {
-  "code": 200,
-  "data": {
-    "equipment_id": "I-9-01",
-    "equipment_name": "电芯烘烤炉",
-    "equipment_type": "baking_oven",
-    "workshop_id": "WS-01",
-    "timestamp": "2026-08-21T14:30:00",
-    "power": 42.3,
-    "load_rate": 0.94,
-    "carbon_emission": 0.41,
-    "temperature": 122.5,
-    "status": 1,
-    "is_anomaly": false
-  }
+    "code": 200,
+    "data": {
+        "equipment_id": "I-9-01",
+        "equipment_name": "电芯烘烤炉",
+        "equipment_type": "baking_oven",
+        "workshop_id": "WS-01",
+        "timestamp": "2026-08-21T14:30:00",
+        "power": 42.3,
+        "load_rate": 0.94,
+        "carbon_emission": 0.41,
+        "temperature": 122.5,
+        "status": 1,
+        "is_anomaly": false
+    }
 }
 ```
 
@@ -341,22 +367,22 @@
 
 ```json
 {
-  "code": 200,
-  "data": {
-    "count": 78,
-    "items": [
-      {
-        "equipment_id": "A-1-01",
-        "equipment_name": "外观检测机1号",
-        "equipment_type": "appearance_inspector",
-        "workshop_id": "WS-03",
-        "team_id": "TEAM-A",
-        "rated_power": 3.0,
-        "category": "检测设备"
-      }
-    ],
-    "workshop_filter": null
-  }
+    "code": 200,
+    "data": {
+        "count": 78,
+        "items": [
+            {
+                "equipment_id": "A-1-01",
+                "equipment_name": "外观检测机1号",
+                "equipment_type": "appearance_inspector",
+                "workshop_id": "WS-03",
+                "team_id": "TEAM-A",
+                "rated_power": 3.0,
+                "category": "检测设备"
+            }
+        ],
+        "workshop_filter": null
+    }
 }
 ```
 
@@ -364,12 +390,12 @@
 
 ## 四、错误码说明
 
-| code | 含义 | 处理建议 |
-|------|------|----------|
-| 200 | 成功 | 正常处理 |
-| 400 | 参数错误 | 检查请求体 schema 是否匹配 |
-| 404 | 资源不存在（如 equipment_id 不在清单） | 确认设备ID是否在 78 台清单内 |
-| 500 | 服务内部错误 | 查看 response.data.error 字段获取错误信息 |
+| code | 含义                                   | 处理建议                                  |
+| ---- | -------------------------------------- | ----------------------------------------- |
+| 200  | 成功                                   | 正常处理                                  |
+| 400  | 参数错误                               | 检查请求体 schema 是否匹配                |
+| 404  | 资源不存在（如 equipment_id 不在清单） | 确认设备ID是否在 78 台清单内              |
+| 500  | 服务内部错误                           | 查看 response.data.error 字段获取错误信息 |
 
 > 所有 500 错误都做了 try-except 兜底，不会让 FastAPI 抛栈，但建议后端联调时关注 `data.error` 字段做日志记录。
 
@@ -420,11 +446,12 @@ import axios from 'axios';
 const API = axios.create({ baseURL: 'http://localhost:8000/api/v1' });
 
 // 厂区总览
-const overview = await API.get('/carbon/overview').then(r => r.data.data);
+const overview = await API.get('/carbon/overview').then((r) => r.data.data);
 
 // 设备列表
-const list = await API.get('/equipment/list', { params: { workshop_id: 'WS-01' } })
-    .then(r => r.data.data);
+const list = await API.get('/equipment/list', {
+    params: { workshop_id: 'WS-01' },
+}).then((r) => r.data.data);
 ```
 
 ---
@@ -477,15 +504,15 @@ const list = await API.get('/equipment/list', { params: { workshop_id: 'WS-01' }
 > 按执行计划（Step 1A）要求，用 `test_api.py` 核对了全部接口的**实际返回字段**，差异如下。
 > **后端按实际字段开发**，本文档其余章节已同步修正；`api_server/schemas.py` 契约也已对齐。
 
-| # | 接口 | 差异点 | 后端处理方式 |
-|---|------|--------|--------------|
-| 1 | `POST /anomaly/detect` | 实际多返回 `equipment_name` / `should_alert` / `threshold_type`（文档原 schema 漏了） | 直接可用；`threshold_type` 取值：`lstm`(已训练) / `fallback`(未训练兜底) / `adaptive` / `fixed` |
-| 2 | `POST /traceability/report` | 实际多返回 `team_id` / `health_score`（0-100 设备健康分） | 直接可用，前端可展示健康分徽标 |
-| 3 | `POST /strategy/generate` | 方案对象无 `target` 字段，实为 `target_equipment`（设备类方案）/ `target_workshop`（车间类方案），另含 `constraints` 等 | 按方案类型取对应字段；schema 已同步 |
-| 4 | `GET /equipment/realtime/{id}` | 无数据时**不报错**，返回占位结构（power=0 等）+ `message` 字段 | 前端判 `message` 存在时展示"暂无数据" |
-| 5 | `POST /carbon/query` | 无数据时返回 `records: []` + `message` | 同上 |
-| 6 | scaler 文件名 | `scaler_{equipment_id}.pkl` **训练后才存在**；此前误提交的 `scaler.pkl` 残留已清理 | 联调前 `ls output/model_weight/` 核对；未训练时无需 scaler，接口自动 fallback |
-| 7 | 缓存行为 | overview / heatmap / realtime 有 30s 内存缓存 | 改数据不生效等 30s；生产可调 `services._CACHE_TTL` |
+| #   | 接口                           | 差异点                                                                                                                  | 后端处理方式                                                                                    |
+| --- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| 1   | `POST /anomaly/detect`         | 实际多返回 `equipment_name` / `should_alert` / `threshold_type`（文档原 schema 漏了）                                   | 直接可用；`threshold_type` 取值：`lstm`(已训练) / `fallback`(未训练兜底) / `adaptive` / `fixed` |
+| 2   | `POST /traceability/report`    | 实际多返回 `team_id` / `health_score`（0-100 设备健康分）                                                               | 直接可用，前端可展示健康分徽标                                                                  |
+| 3   | `POST /strategy/generate`      | 方案对象无 `target` 字段，实为 `target_equipment`（设备类方案）/ `target_workshop`（车间类方案），另含 `constraints` 等 | 按方案类型取对应字段；schema 已同步                                                             |
+| 4   | `GET /equipment/realtime/{id}` | 无数据时**不报错**，返回占位结构（power=0 等）+ `message` 字段                                                          | 前端判 `message` 存在时展示"暂无数据"                                                           |
+| 5   | `POST /carbon/query`           | 无数据时返回 `records: []` + `message`                                                                                  | 同上                                                                                            |
+| 6   | scaler 文件名                  | `scaler_{equipment_id}.pkl` **训练后才存在**；此前误提交的 `scaler.pkl` 残留已清理                                      | 联调前 `ls output/model_weight/` 核对；未训练时无需 scaler，接口自动 fallback                   |
+| 7   | 缓存行为                       | overview / heatmap / realtime 有 30s 内存缓存                                                                           | 改数据不生效等 30s；生产可调 `services._CACHE_TTL`                                              |
 
 **核对工具**：项目根目录 `python test_api.py`（算法 8000 起后运行）——末尾自动打印各接口实际顶层字段与本文档的比对结果。
 

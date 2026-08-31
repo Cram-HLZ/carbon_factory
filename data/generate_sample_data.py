@@ -55,9 +55,11 @@ REPRESENTATIVE_EQUIPMENT = [
 ]
 
 # 时间范围
-START_TIME = datetime(2026, 8, 15, 0, 0, 0)  # 周六
 DURATION_DAYS = 7
 SAMPLE_FREQ_MIN = 1  # 分钟级
+# 起始点对齐到「最近 7 天」的整点，保证数据覆盖“现在”：
+#   实时接口查最近 1 小时、热力图默认近 7 天，都不再返回空数据
+START_TIME = (datetime.now() - timedelta(days=DURATION_DAYS)).replace(minute=0, second=0, microsecond=0)
 
 # 异常事件配置（每台设备的异常注入点）
 ANOMALY_EVENTS = {

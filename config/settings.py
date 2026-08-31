@@ -401,7 +401,62 @@ API_CONFIG = {
 
 
 # ============================================================
-# 11. 统一导出（settings 字典，便于整体传入或一次性查看）
+# 11. 认证与角色权限配置（阶段2 · 登录/角色管理）
+# ============================================================
+# 三种角色：管理层 / 运维岗 / IT管理员
+#   permissions 为权限标识列表，'*' 表示拥有全部权限（仅 IT管理员）
+# 权限标识约定（可按需在业务路由中校验）：
+#   view:dashboard    查看碳排总览
+#   view:heatmap      查看碳排热力图
+#   view:equipment    查看设备实时/列表
+#   view:alarm        查看告警
+#   handle:alarm      处理告警
+#   view:report       查看溯源报告
+#   generate:strategy 生成降碳方案
+#   manage:user       用户与角色管理
+ROLES = {
+    'management': {
+        'name': '管理层',
+        'description': '厂区/车间管理层：查看总览、热力图、溯源报告，生成降碳方案',
+        'permissions': [
+            'view:dashboard',
+            'view:heatmap',
+            'view:equipment',
+            'view:alarm',
+            'view:report',
+            'generate:strategy',
+        ],
+    },
+    'operator': {
+        'name': '运维岗',
+        'description': '设备运维人员：查看设备实时工况与告警，处理告警',
+        'permissions': [
+            'view:equipment',
+            'view:alarm',
+            'handle:alarm',
+        ],
+    },
+    'it_admin': {
+        'name': 'IT管理员',
+        'description': '系统管理员：拥有全部权限（含用户与角色管理、系统配置）',
+        'permissions': ['*'],
+    },
+}
+
+AUTH_CONFIG = {
+    # 令牌签名密钥（生产务必通过环境变量 AUTH_SECRET_KEY 覆盖，勿硬编码到仓库）
+    'secret_key': os.environ.get('AUTH_SECRET_KEY', 'carbon-factory-dev-secret-change-me'),
+    # 签名算法标识（令牌负载中记录，便于将来扩展非对称算法）
+    'algorithm': 'HS256',
+    # 访问令牌有效期（秒），默认 8 小时；可用 AUTH_TOKEN_EXPIRE 覆盖
+    'access_token_expire_seconds': int(os.environ.get('AUTH_TOKEN_EXPIRE', 8 * 3600)),
+    # 密码 PBKDF2-HMAC-SHA256 迭代次数
+    'pbkdf2_iterations': 100_000,
+}
+
+
+# ============================================================
+# 12. 统一导出（settings 字典，便于整体传入或一次性查看）
 # ============================================================
 settings = {
     'BASE_DIR': BASE_DIR,
@@ -421,4 +476,6 @@ settings = {
     'CARBON_FACTORS': CARBON_FACTORS,
     'MODEL_CONFIG': MODEL_CONFIG,
     'THRESHOLD_CONFIG': THRESHOLD_CONFIG,
+    'ROLES': ROLES,
+    'AUTH_CONFIG': AUTH_CONFIG,
 }

@@ -225,7 +225,7 @@ class CarbonCalculator:
         # 按小时趋势（折线图用）
         df_ts = df.copy()
         if 'timestamp' in df_ts.columns:
-            df_ts['hour'] = pd.to_datetime(df_ts['timestamp']).dt.floor('H')
+            df_ts['hour'] = pd.to_datetime(df_ts['timestamp']).dt.floor('h')
             hourly = df_ts.groupby('hour').agg(
                 carbon_emission=('carbon_emission', 'sum'),
                 energy_consumption=('power', 'sum'),
