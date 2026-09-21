@@ -1,13 +1,20 @@
 """
 最小单元测试脚本：scaler保存与加载测试
 运行方式：终端 python test_scaler_io.py
+
+注意：scaler 会写入临时目录，不污染 output/model_weight/ 下的正式模型权重。
 """
-import numpy as np
+import tempfile
 from pathlib import Path
 
-# 导入项目配置和类
-from config import MODEL_WEIGHT_DIR
+import numpy as np
+
+import feature_engineer.sequence_builder as sb
 from feature_engineer.sequence_builder import SequenceBuilder
+
+# 将 scaler 输出重定向到临时目录，避免测试污染正式模型权重目录
+_MODEL_WEIGHT_DIR = Path(tempfile.mkdtemp(prefix='scaler_test_'))
+sb.MODEL_WEIGHT_DIR = _MODEL_WEIGHT_DIR
 
 
 def test_case_1_generic_scaler():
@@ -28,7 +35,7 @@ def test_case_1_generic_scaler():
         save_path=None
     )
 
-    generic_pkl = MODEL_WEIGHT_DIR / "scaler_generic.pkl"
+    generic_pkl = _MODEL_WEIGHT_DIR / "scaler_generic.pkl"
     print(f"文件预期输出路径：{generic_pkl}")
 
     if generic_pkl.exists():
@@ -62,7 +69,7 @@ def test_case_2_equipment_scaler():
     X_test = np.random.rand(20, seq_len, n_feature)
 
     equipment_id = "equipment_01"
-    equip_pkl_path = MODEL_WEIGHT_DIR / f"scaler_{equipment_id}.pkl"
+    equip_pkl_path = _MODEL_WEIGHT_DIR / f"scaler_{equipment_id}.pkl"
 
     # =========修复点：实例化=========
     builder = SequenceBuilder()

@@ -23,6 +23,7 @@ generate_sample_data —— 模拟设备时序数据生成脚本
 from __future__ import annotations
 
 import os
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -301,31 +302,47 @@ def generate_for_equipment(eq_id: str, eq_type: str) -> pd.DataFrame:
     return df
 
 
-def main():
-    """生成全部代表设备的合并 CSV"""
+def generate_sample_csv() -> Path:
+    """生成全部代表设备的合并 CSV 并落盘，返回输出文件路径"""
     np.random.seed(42)  # 固定种子保证可复现
     print(f'[generate] 开始生成 {len(REPRESENTATIVE_EQUIPMENT)} 台设备 × 7 天 数据...')
     frames = []
     for eq_id, eq_type in REPRESENTATIVE_EQUIPMENT:
         print(f'  - {eq_id} ({eq_type})')
-        df = generate_for_equipment(eq_id, eq_type)
-        frames.append(df)
+        frames.append(generate_for_equipment(eq_id, eq_type))
     all_df = pd.concat(frames, ignore_index=True)
     print(f'[generate] 合并后总行数: {len(all_df)}')
 
-    # 输出路径
     out_path = RAW_DATA_DIR / 'sample_equipment_data.csv'
     out_path.parent.mkdir(parents=True, exist_ok=True)
     all_df.to_csv(out_path, index=False, encoding='utf-8-sig')
-    print(f'[generate] CSV saved → {out_path}')
-    print(f'[generate] 文件大小约 {out_path.stat().st_size / 1024:.1f} KB')
+    print(f'[generate] CSV saved → {out_path} '
+          f'({out_path.stat().st_size / 1024:.1f} KB)')
 
-    # 简单验证
-    print('\n[verify] 数据预览：')
-    print(all_df.head(3))
-    print(f'\n[verify] 设备数量: {all_df["equipment_id"].nunique()}')
-    print(f'[verify] 时间范围: {all_df["timestamp"].min()} ~ {all_df["timestamp"].max()}')
-    print(f'[verify] 总碳排估算: {all_df["power"].sum() / 60 * 0.5810:.2f} kgCO2')
+    print(f'[verify] 设备 {all_df["equipment_id"].nunique()} 台, '
+          f'时间 {all_df["timestamp"].min()} ~ {all_df["timestamp"].max()}, '
+          f'总碳排估算 {all_df["power"].sum() / 60 * 0.5810:.2f} kgCO2')
+    return out_path
+
+
+def ensure_sample_data(max_age_hours: float = 24) -> bool:
+    """若样本数据缺失或过期（距上次生成超过 max_age_hours）则自动重新生成。
+
+    供服务启动时兜底调用：sample_equipment_data.csv 一旦生成窗口就固定，
+    几天后会落后于「近 7 天」动态查询窗口，导致热力图 / 溯源 / 碳排查询返回空数据。
+    返回是否执行了重新生成。
+    """
+    out_path = RAW_DATA_DIR / 'sample_equipment_data.csv'
+    if out_path.exists() and (time.time() - out_path.stat().st_mtime) < max_age_hours * 3600:
+        return False
+    print('[sample-data] 样本数据缺失或已过期，自动重新生成...')
+    generate_sample_csv()
+    return True
+
+
+def main():
+    """生成全部代表设备的合并 CSV（命令行入口：python data/generate_sample_data.py）"""
+    generate_sample_csv()
 
 
 if __name__ == '__main__':

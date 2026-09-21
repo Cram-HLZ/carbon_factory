@@ -1,0 +1,20 @@
+# ============================================================
+# 公共依赖（算法服务 + 后端服务 共用）
+# ============================================================
+
+# === Web 框架（FastAPI）===
+# 以下均为 Python 3.13 兼容版本（原 0.115.0 / 0.30.6 / 2.9.2 无 3.13 wheel）
+fastapi==0.141.1
+uvicorn==0.52.4
+pydantic==2.13.5
+
+# === 配置加载（.env）===
+python-dotenv==1.2.3
+
+# === 数值计算 ===
+# 后端虽不直接 import numpy/pandas，但报表聚合走
+# carbon_strategy.strategy_engine -> carbon_strategy.equipment_models
+# 间接依赖 numpy/pandas，故两端都需安装
+# Python 3.13 需 numpy>=2.0 / pandas>=2.2.3（原 1.26.4 / 2.2.2 无 3.13 wheel）
+numpy==2.5.2
+pandas==3.0.5

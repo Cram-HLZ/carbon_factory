@@ -1,9 +1,10 @@
 """
-models —— SQLAlchemy ORM 模型定义（5 张表）
+models —— SQLAlchemy ORM 模型定义（6 张表）
 
 字段严格对齐《backend_integration_checklist.html》阶段2「数据库设计与搭建」：
     设备表    equipment        ID / 名称 / 类型 / 车间 / 班组 / 额定功率
     时序表    time_series_data 功率 / 温度 / 振动 / 负载率 / 碳排（按分钟入库）
+    归档表    time_series_archive 分钟级数据降采样聚合（小时/天），支撑 3 年历史查询
     告警表    alarm_record     设备ID / 时间 / 严重度 / 根因 / 处理状态
     方案表    strategy         设备ID / 方案类型 / 节能估算 / 优先级
     用户表    user             账号 / 角色 / 密码哈希 / 权限
@@ -25,6 +26,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     JSON,
     String,
@@ -68,6 +70,36 @@ class TimeSeriesData(Base):
     vibration: Mapped[float] = mapped_column(Float, nullable=True, comment='振动(mm/s)')
     load_rate: Mapped[float] = mapped_column(Float, nullable=True, comment='负载率(0-1)')
     carbon_emission: Mapped[float] = mapped_column(Float, nullable=True, comment='碳排放(kgCO2)')
+
+
+class TimeSeriesArchive(Base):
+    """时序归档表：分钟级数据降采样聚合，支撑 3 年历史高效查询
+
+    原始分钟数据在 time_series_data 中仅保留近 N 天（见 config.ARCHIVE_CONFIG），
+    过期后按「小时 / 天」粒度的统计桶归档到本表，原始分钟行被删除以控制库容。
+    查询时优先读原始表，跨期自动回落到归档表。
+    """
+
+    __tablename__ = 'time_series_archive'
+    __table_args__ = (
+        UniqueConstraint('equipment_id', 'bucket_start', 'granularity', name='uq_arch_equip_bucket_gran'),
+        Index('ix_arch_bucket_start', 'bucket_start'),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    equipment_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey('equipment.equipment_id'), nullable=False, index=True
+    )
+    bucket_start: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True, comment='聚合桶起始时间')
+    granularity: Mapped[str] = mapped_column(String(8), nullable=False, default='hour', comment='hour / day')
+    power_avg: Mapped[float] = mapped_column(Float, nullable=True, comment='平均功率(kW)')
+    power_max: Mapped[float] = mapped_column(Float, nullable=True, comment='峰值功率(kW)')
+    load_rate_avg: Mapped[float] = mapped_column(Float, nullable=True, comment='平均负载率(0-1)')
+    temperature_avg: Mapped[float] = mapped_column(Float, nullable=True, comment='平均温度(℃)')
+    vibration_avg: Mapped[float] = mapped_column(Float, nullable=True, comment='平均振动(mm/s)')
+    carbon_sum: Mapped[float] = mapped_column(Float, nullable=True, comment='碳排累计(kgCO2)')
+    energy_sum: Mapped[float] = mapped_column(Float, nullable=True, comment='能耗累计(kWh)')
+    sample_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, comment='桶内分钟采样点数')
 
 
 class AlarmRecord(Base):

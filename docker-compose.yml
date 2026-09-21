@@ -1,0 +1,52 @@
+services:
+  algo:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.algo
+    networks: [app]
+
+  backend:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.backend
+    environment:
+      # 跨容器调用算法，覆盖默认的 localhost
+      ALGO_BASE: http://algo:8000/api/v1
+      # JWT 签名密钥，生产必须设置为强随机值（见 .env）
+      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY}
+      # 邮件 SMTP
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM}
+      SMTP_TO: ${SMTP_TO}
+      # 移动端推送（PushPlus / Server酱）
+      PUSH_TYPE: ${PUSH_TYPE:-pushplus}
+      PUSHPLUS_TOKEN: ${PUSHPLUS_TOKEN}
+      SERVERCHAN_KEY: ${SERVERCHAN_KEY}
+    volumes:
+      # SQLite 数据库文件持久化（database/carbon_factory.db）
+      - database_data:/app/database
+      # 原始/处理数据、模型权重、日志、图表
+      - ./data:/app/data
+      - ./output:/app/output
+    depends_on: [algo]
+    networks: [app]
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.web
+    ports:
+      - "80:80"
+      # 配置 HTTPS 后开启 443（证书在 nginx.conf 中挂载）
+      # - "443:443"
+    depends_on: [backend]
+    networks: [app]
+
+networks:
+  app:
+
+volumes:
+  database_data:

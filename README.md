@@ -1,8 +1,8 @@
 # 数字孪生锂电工厂碳排 AI 监测与溯源系统
 
 > 基于 LSTM 自编码器的设备异常检测 + IPCC 因子法碳排核算 + AI 降碳方案推理，
-> 配套 Web 后端（认证/采集/数据库）与前端看板，覆盖「采集 → 核算 → 检测 → 溯源 → 策略」全链路。
-> 最后更新：2026-08-31
+> 配套 Web 后端（认证/采集/数据库/告警/报表）与 Vue3 前端看板，覆盖「采集 → 核算 → 检测 → 告警 → 溯源 → 策略 → 报表」全链路。
+> 最后更新：2026-09-21
 
 ***
 
@@ -14,7 +14,7 @@
 | ----- | ---- | --------------------------- | ---------------------------------- |
 | 算法服务  | 8000 | FastAPI + PyTorch           | 碳排核算、LSTM 异常检测、溯源分析、AI 降碳方案        |
 | 后端服务  | 8001 | FastAPI + SQLAlchemy        | 认证授权、数据采集入口（MES/EMS/PLC）、业务组装、转发算法 |
-| 前端静态站 | 8003 | HTML + Bootstrap5 + ECharts | 登录、总览、热力图、设备实时、用户管理                |
+| 前端站点   | 8002 | Vue3 + Vite + Pinia + ECharts | 登录、总览、热力图、设备实时、告警中心、报表中心、用户管理    |
 
 核心能力：
 
@@ -24,6 +24,8 @@
 4. **AI 降碳方案**：设备运维/生产排班/工艺优化三类方案模板 + 多目标加权排序
 5. **用户认证与权限**：标准 JWT（HS256）无状态认证，三级角色（管理层/运维岗/IT管理员）
 6. **数据采集**：MES/EMS/PLC 入站 HTTP 接口 + 模拟采集器
+7. **告警中心**：实时异常告警（WebSocket / 邮件 / 移动端多渠道）+ 告警增删改查 + 10 分钟冷却
+8. **报表与归档**：月度碳排报告 / 设备溯源台账 / 降碳成效导出 PDF·Excel + 时序分层归档（保留 3 年）
 
 ***
 
@@ -35,14 +37,14 @@
         ▼
 ┌─────────────────────────┐
 │   后端服务 :8001        │
-│  · 认证授权(JWT)        │── 数据库(SQLite，5张表)
+│  · 认证授权(JWT)        │── 数据库(SQLite，6张表)
 │  · 数据采集入站          │
 │  · 业务组装/转发         │──── HTTP ────▶ 算法服务 :8000
 └───────────┬─────────────┘                 (LSTM/碳排/溯源/策略)
             │  (REST /api/*)
             ▼
 ┌─────────────────────────┐
-│   前端静态站 :8003       │  login / overview / heatmap / realtime / users
+│   前端站点 :8002         │  login / overview / heatmap / realtime / alarms / reports / users
 └─────────────────────────┘
 ```
 
@@ -54,9 +56,9 @@
 
 ### 3.1 Python 版本
 
-* 推荐 Python **3.10 \~ 3.12**
+* 推荐 Python **3.13**（依赖已按 3.13 锁定，见 `requirements-*.txt`；容器镜像同为 `python:3.13-slim`）
 
-* ⚠️ 兼容性提示：`torch==2.4.0`、`numpy==1.26.4` 等固定版本与 Python 3.13 存在兼容问题。密码哈希已改用标准库 PBKDF2-HMAC-SHA256（不依赖 bcrypt），可直接跑在 3.13 上，但训练 LSTM 仍建议用 3.10\~3.12。
+* 密码哈希使用标准库 PBKDF2-HMAC-SHA256（不依赖 bcrypt），LSTM 训练（CPU 版 PyTorch 2.13）与碳排核算（numpy/pandas）均兼容 3.13。
 
 ### 3.2 安装步骤
 
@@ -70,13 +72,15 @@ python -m venv env
 env\Scripts\activate          # Windows
 # source env/bin/activate     # Linux/Mac
 
-# 3. 安装依赖
+# 3. 安装依赖（requirements.txt 为全量入口，内部按 base/algo/backend 拆分为三个文件）
 pip install -r requirements.txt
 
-# 4. 初始化数据库（建 5 张表 + 灌入 78 台设备与 3 个默认账号）
+# 4. 初始化数据库（建 6 张表 + 灌入 78 台设备与 3 个默认账号）
 python -m database.init_db
 # → 生成 database/carbon_factory.db（SQLite，可用 DATABASE_URL 切到 MySQL）
 ```
+
+> 容器化部署见 3.5 节；敏感凭据（SMTP / 推送 / JWT 密钥）放入 `.env`（模板见 `.env.example`）。样本数据会在服务启动时自动刷新，无需手动生成。
 
 ### 3.3 一键启动
 
@@ -86,7 +90,7 @@ python main.py                 # 推荐：./env/Scripts/python.exe main.py
 
 启动后同时拉起三个服务：
 
-* 前端页面：<http://localhost:8003/login.html>
+* 前端页面：<http://localhost:8002/>
 
 * 后端接口：<http://localhost:8001/docs>
 
@@ -102,6 +106,24 @@ python main.py                 # 推荐：./env/Scripts/python.exe main.py
 
 生产环境首次登录后应及时修改密码。
 
+### 3.5 Docker 容器化 + Nginx 反向代理
+
+```bash
+# 项目根目录执行（需先复制 .env.example 为 .env 并填入凭据）
+docker compose up -d --build
+```
+
+编排见 `docker-compose.yml`，三个服务：
+
+| 组件          | 构建来源                                    | 说明                                        |
+| ----------- | --------------------------------------- | ----------------------------------------- |
+| 算法服务      | deploy/Dockerfile.algo                   | Python 3.13 + CPU 版 PyTorch              |
+| 后端服务      | deploy/Dockerfile.backend                | Python 3.13 + FastAPI（不装 torch，镜像更小） |
+| 前端 + Nginx | deploy/Dockerfile.web + deploy/nginx.conf | 托管 web/dist + 反代 `/api` 和 `/ws`（含升级头） |
+
+* 前端经 Nginx 同源反代 `/api` → 后端 8001、`/ws` → 后端 WebSocket，容器内无需跨域。
+* 生产部署请设置 `APP_ENV=production` 并配置 `AUTH_SECRET_KEY`，否则默认密钥会被拒绝启动。
+
 ***
 
 ## 四、单独启动各服务
@@ -113,8 +135,9 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 # 后端服务（8001）
 uvicorn backend.main:app --host 0.0.0.0 --port 8001
 
-# 前端静态站（8003）
-python -m http.server 8003 --directory frontend
+# 前端站点（8002，Vue3 + Vite SPA）
+cd web && npm install && npm run build
+python -m http.server 8002 --directory web/dist
 ```
 
 > 三个命令均需在**项目根目录**执行。
@@ -143,6 +166,14 @@ python -m http.server 8003 --directory frontend
 * 业务转发：`/carbon/overview`、`/carbon/heatmap`、`/equipment/realtime/{id}`、`/equipment/list`、`/anomaly/equipment/{id}`、`/anomaly/detect`、`/carbon/query`、`/traceability/report`、`/strategy/generate`
 
 * 探活：`GET /api/health`（同时探测算法可达性）
+
+* 告警管理（`/api/alarms`）：`GET/POST` 列表/手动录入、`GET/PUT/DELETE /{id}` 详情/编辑/删除、`PUT /{id}/status` 改处理状态、`DELETE` 批量删除、`POST /scan` 手动扫描
+
+* 报表中心（`/api/report`，`format=json/excel/pdf`）：`GET /monthly` 月度碳排报告、`GET /traceability` 设备溯源台账、`GET /savings` 降碳成效对比
+
+* 历史时序（`/api/history`）：`GET /timeseries` 单设备时序查询、`POST /archive` 手动归档
+
+* 实时告警推送：WebSocket `/ws/alerts`
 
 ### 5.3 数据采集（前缀 `/api/ingest`）
 
@@ -190,15 +221,18 @@ python -m http.server 8003 --directory frontend
 DATABASE_URL=mysql+pymysql://user:password@localhost:3306/carbon_factory
 ```
 
-共 5 张表（定义见 [database/models.py](database/models.py)）：
+共 6 张表（定义见 [database/models.py](database/models.py)）：
 
-| 表                  | 说明                                 |
-| ------------------ | ---------------------------------- |
-| `equipment`        | 设备主数据（78 台 / 12 类）                 |
-| `time_series_data` | 时序数据（功率/温度/振动/负载率/碳排，按 (设备,时间) 唯一） |
-| `alarm_record`     | 告警记录                               |
-| `strategy`         | 降碳方案                               |
-| `user`             | 用户（账号/角色/密码哈希/权限）                  |
+| 表                     | 说明                                          |
+| -------------------- | ------------------------------------------- |
+| `equipment`          | 设备主数据（78 台 / 12 类）                          |
+| `time_series_data`   | 分钟级时序数据（功率/温度/振动/负载率/碳排，近 30 天热数据）        |
+| `time_series_archive`| 归档数据（小时/天统计桶，保留 3 年）                       |
+| `alarm_record`       | 告警记录                                        |
+| `strategy`           | 降碳方案                                        |
+| `user`               | 用户（账号/角色/密码哈希/权限）                           |
+
+> 时序数据分层存储：分钟级原始数据保留近 30 天，过期后降采样为小时/天统计桶归档，归档保留 3 年；报表聚合走归档感知查询层，跨原始表与归档表透明读取。
 
 ***
 
@@ -213,25 +247,40 @@ carbon_factory/
 ├── feature_engineer/          # 数据与特征工程
 ├── carbon_strategy/           # 碳排核算 + 溯源 + 降碳策略
 ├── backend/                   # 后端服务（8001）
-│   ├── main.py                # 后端入口（挂载 routes/ingestion/auth）
+│   ├── main.py                # 后端入口（挂载 routes/ingestion/auth/alarm/report/history）
 │   ├── routes.py              # 业务路由（转发算法）
 │   ├── auth.py                # 认证与用户管理
 │   ├── security.py            # JWT 签发/校验 + 密码哈希 + 权限依赖
 │   ├── ingestion.py           # 数据采集入站接口（MES/EMS/PLC）
-│   └── algorithm_client.py    # 算法服务 HTTP 客户端
+│   ├── algorithm_client.py    # 算法服务 HTTP 客户端
+│   ├── alarm_service.py       # 告警增删改查 + 冷却 + 多渠道编排
+│   ├── alarm_routes.py        # 告警管理 API
+│   ├── report_service.py      # 报表聚合（归档感知查询层）
+│   ├── report_export.py       # Excel/PDF 导出
+│   ├── report_routes.py       # 报表预览与下载 API
+│   ├── archive_service.py     # 时序降采样归档
+│   ├── archive_loop.py        # 后台归档循环
+│   ├── timeseries_service.py  # 分层时序查询
+│   ├── history_routes.py      # 历史时序/归档查询
+│   ├── detection_loop.py      # 后台异常检测循环
+│   ├── notifier.py            # 多渠道通知（WebSocket/邮件/移动端）
+│   └── websocket.py           # WebSocket 连接管理
 ├── collector/                 # 采集入写服务（落库 + 碳排核算 + 模拟器）
 ├── database/                  # 数据库（模型/连接/建表/种子）
-├── frontend/                  # 前端静态站（8003）
-│   ├── app.js                 # 全局脚本（Token 注入/401 拦截/常量）
-│   ├── login.html             # 登录 + 注册
-│   ├── overview.html          # 碳排总览
-│   ├── heatmap.html           # 碳排热力图
-│   ├── realtime.html          # 设备实时
-│   └── users.html             # 用户与角色管理
+├── web/                       # 前端源码（Vue3 + Vite SPA，8002 serve 构建产物 dist/）
+│   ├── src/                   # 页面组件 / 状态 / 接口封装 / 路由
+│   └── dist/                  # 生产构建产物（index.html + assets）
 ├── data/                      # 数据与样本生成
 ├── docs/                      # 接口文档 / 模型说明
+├── deploy/                    # Docker + Nginx 部署（Dockerfile.* / nginx.conf）
 ├── output/                    # 模型权重 / 图表 / 日志（git 忽略）
-└── requirements.txt
+├── docker-compose.yml         # 三服务容器编排（算法/后端/前端+Nginx）
+├── .env.example               # 环境变量模板（SMTP / 推送 / JWT 密钥 / CORS 白名单）
+├── .dockerignore              # Docker 构建忽略清单
+├── requirements.txt           # 全量安装入口（引用下面三个拆分包）
+├── requirements-base.txt      # 公共依赖（FastAPI / numpy / pandas）
+├── requirements-algo.txt      # 算法依赖（torch / scikit-learn / joblib）
+└── requirements-backend.txt   # 后端依赖（SQLAlchemy / pymysql / openpyxl）
 ```
 
 ***
@@ -266,42 +315,14 @@ python -m Lstm_model.train --equipment_id I-9-01 --epochs 30
 | `THRESHOLD_CONFIG['alert_cooldown_seconds']` | 600       | 同设备告警冷却时间                           |
 | `AUTH_CONFIG['algorithm']`                   | HS256     | JWT 签名算法                            |
 | `AUTH_CONFIG['access_token_expire_seconds']` | 28800     | 令牌有效期（8h），可用 `AUTH_TOKEN_EXPIRE` 覆盖 |
-| `AUTH_CONFIG['secret_key']`                  | dev 默认值   | 生产必须用环境变量 `AUTH_SECRET_KEY` 覆盖      |
+| `AUTH_CONFIG['secret_key']`                  | dev 默认值   | 生产必须用 `AUTH_SECRET_KEY` 覆盖；`APP_ENV=production` 时缺省拒绝启动 |
+| `APP_ENV`                                    | 未设置      | 设为 `production` 启用生产安全护栏（校验密钥）      |
+| `CORS_ORIGINS`                               | localhost 开发源 | 跨域白名单，逗号分隔（`.env` 可覆盖为实际前端域名）    |
 | `DATABASE_URL`                               | sqlite    | 环境变量，切 MySQL 用                      |
 
 ***
 
-## 十一、当前进度与待办
-
-### 已完成
-
-* [x] 算法服务（碳排核算 / LSTM 异常检测 / 溯源 / 降碳方案）
-
-* [x] 后端服务（业务转发 + 数据采集入口 + 认证授权）
-
-* [x] 前端（登录 + 总览 + 热力图 + 设备实时 + 用户管理）
-
-* [x] 数据库（SQLite 5 张表 + 设备/用户种子数据）
-
-* [x] 用户认证与角色权限（标准 JWT + 三级角色 + 用户增删改查）
-
-* [x] 一键启动（`python main.py` 同时拉起三服务）
-
-### 待办
-
-* [ ] 真实 MES/EMS/PLC 对接（当前为 HTTP 入站接口 + 模拟数据）
-
-* [ ] LSTM 模型训练（当前异常检测退化为统计偏离度 fallback）
-
-* [ ] 告警推送（WebSocket / 邮件 / 移动端）
-
-* [ ] 报表导出（PDF / Excel）
-
-* [ ] Docker 容器化 + Nginx 反向代理部署
-
-***
-
-## 十二、代码规范
+## 十一、代码规范
 
 * **格式化**：保存自动格式化，4 空格缩进，单引号（团队 `.vscode/settings.json` 已统一）
 
@@ -317,7 +338,7 @@ python -m Lstm_model.train --equipment_id I-9-01 --epochs 30
 
 ***
 
-## 十三、联系方式
+## 十二、联系方式
 
 * 算法负责人：队长（算法）
 

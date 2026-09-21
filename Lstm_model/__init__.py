@@ -16,8 +16,19 @@ Lstm_model —— LSTM 异常检测模型包
         本包主要用于模型训练与离线评估，部署时由 api_server.services 调用。
 """
 
-from Lstm_model.model import LSTMAutoencoder
 from Lstm_model.anomaly_detector import AnomalyDetector
-from Lstm_model.predict import ModelPredictor
+
+# torch 未安装时优雅降级：让 LSTMAutoencoder / ModelPredictor 为 None，
+# 异常检测接口退化为统计兜底（见 api_server.services.detect_anomaly）。
+# 只在真正需要训练/推理（有模型权重）时才要求 torch，避免算法服务因缺 torch 启动失败。
+try:
+    from Lstm_model.model import LSTMAutoencoder
+except ImportError:
+    LSTMAutoencoder = None  # type: ignore[assignment,misc]
+
+try:
+    from Lstm_model.predict import ModelPredictor
+except ImportError:
+    ModelPredictor = None  # type: ignore[assignment,misc]
 
 __all__ = ['LSTMAutoencoder', 'AnomalyDetector', 'ModelPredictor']

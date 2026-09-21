@@ -5,13 +5,13 @@ main —— 算法服务应用入口 + 全站一键启动
     uvicorn main:app --host 0.0.0.0 --port 8000
     访问：http://localhost:8000/docs
 
-【一键启动整个网站】（算法 8000 + 后端 8001 + 前端静态站 8003）
+【一键启动整个网站】（算法 8000 + 后端 8001 + 前端静态站 8002）
     在项目根目录执行：
         python main.py
     推荐用项目虚拟环境运行（避免系统 Python 缺依赖）：
         ./env/Scripts/python.exe main.py
     启动后访问：
-        http://localhost:8003/login.html   前端登录页
+        http://localhost:8002/              前端页面
         http://localhost:8001/docs         后端接口文档
         http://localhost:8000/docs         算法接口文档
 
@@ -20,11 +20,13 @@ main —— 算法服务应用入口 + 全站一键启动
 
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api_server.routes import router as api_router
-from config.settings import API_CONFIG
+from config.settings import API_CONFIG, CORS_ORIGINS
 
 
 app = FastAPI(
@@ -41,11 +43,10 @@ app = FastAPI(
     },
 )
 
-# 跨域配置（前端联调需要）
+# 跨域配置（前端联调需要）：显式白名单，避免 allow_origins=['*'] 与 credentials 冲突
 app.add_middleware(
     CORSMiddleware,
-    # 开发阶段全开，生产部署建议改为前端域名白名单如 ['http://your-frontend.com']
-    allow_origins=['*'],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*'],
@@ -71,9 +72,16 @@ async def health_check():
     return {'status': 'healthy'}
 
 
+@app.on_event('startup')
+async def _ensure_sample_data():
+    """启动时兜底：样本数据缺失或过期(>24h)则自动重新生成，避免近 7 天接口返回空数据"""
+    from data.generate_sample_data import ensure_sample_data
+    await asyncio.to_thread(ensure_sample_data)
+
+
 if __name__ == '__main__':
     # ============================================================
-    # 一键启动整个网站：算法服务(8000) + 后端服务(8001) + 前端静态站(8003)
+    # 一键启动整个网站：算法服务(8000) + 后端服务(8001) + 前端静态站(8002)
     # 在项目根目录执行：  python main.py
     # 推荐：              ./env/Scripts/python.exe main.py
     # 单独启动算法服务仍可用：  uvicorn main:app --port 8000
@@ -92,7 +100,7 @@ if __name__ == '__main__':
     SERVICES = [
         ('算法服务(8000)', [PY, '-m', 'uvicorn', 'main:app', '--host', '0.0.0.0', '--port', '8000']),
         ('后端服务(8001)', [PY, '-m', 'uvicorn', 'backend.main:app', '--host', '0.0.0.0', '--port', '8001']),
-        ('前端静态站(8003)', [PY, '-m', 'http.server', '8003', '--directory', 'frontend']),
+        ('前端站点(8002)', [PY, '-m', 'http.server', '8002', '--directory', 'web/dist']),
     ]
 
     _procs = []
@@ -121,7 +129,7 @@ if __name__ == '__main__':
         time.sleep(0.6)
 
     print('-' * 62)
-    print('  前端页面   http://localhost:8003/login.html')
+    print('  前端页面   http://localhost:8002/')
     print('  后端接口   http://localhost:8001/docs')
     print('  算法接口   http://localhost:8000/docs')
     print('  按 Ctrl+C 停止全部服务')

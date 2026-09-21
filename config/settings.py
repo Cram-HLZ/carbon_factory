@@ -15,7 +15,13 @@ settings —— 全局配置中心
 """
 
 import os
+import warnings
 from pathlib import Path
+
+from dotenv import load_dotenv
+
+# 加载项目根目录 .env（邮件 SMTP / 移动端推送等真实凭据不进入代码仓库）
+load_dotenv()
 
 # ============================================================
 # 1. 项目路径
@@ -84,6 +90,55 @@ THRESHOLD_CONFIG = {
     'adaptive_window': 24,  # 小时
     'sigma_multiplier': 3.0,
     'alert_cooldown_seconds': 600,
+}
+
+
+# ============================================================
+# 4b. 告警推送配置（WebSocket 实时推送 + 多渠道通知）
+# ============================================================
+# 严重程度分级（与 Lstm_model.anomaly_detector._classify_severity 对齐，
+# 基于 anomaly_score = reconstruction_error / threshold）
+SEVERITY_LEVELS = ['normal', 'low', 'medium', 'high']
+SEVERITY_LABELS = {
+    'normal': '正常',
+    'low': '低',
+    'medium': '中',
+    'high': '高',
+}
+
+ALERT_CONFIG = {
+    # 前端 WebSocket 连接路径（相对后端服务根，落地为 ws://host:8001/ws/alerts）
+    'ws_path': '/ws/alerts',
+    # 后台检测循环扫描间隔（秒）；同一设备告警冷却仍由算法侧 600s 控制
+    'detect_interval_seconds': 30,
+    # 参与实时扫描的代表设备（与 data.generate_sample_data.REPRESENTATIVE_EQUIPMENT 对齐）
+    'scan_equipment': [
+        'I-9-01', 'COMP-01', 'D-4-01', 'C-3-01',
+        'L-12-01', 'FAN-01', 'CHILL-01', 'A-1-01',
+    ],
+}
+
+
+# ============================================================
+# 4c. 多渠道告警推送配置（邮件 SMTP + 移动端 PushPlus/Server酱）
+# ============================================================
+# 真实凭据不写入代码，统一通过项目根目录 .env 提供（见 .env.example）。
+# 未配置时，notifier 中各渠道自动降级为日志记录，不影响主流程。
+
+SMTP_CONFIG = {
+    'host': os.environ.get('SMTP_HOST', ''),
+    'port': int(os.environ.get('SMTP_PORT', '465')),
+    'user': os.environ.get('SMTP_USER', ''),
+    'password': os.environ.get('SMTP_PASSWORD', ''),
+    'from_addr': os.environ.get('SMTP_FROM', ''),
+    'to_addrs': os.environ.get('SMTP_TO', ''),  # 逗号分隔多个收件人
+    'use_ssl': os.environ.get('SMTP_USE_SSL', '1').lower() in ('1', 'true', 'yes'),
+}
+
+MOBILE_PUSH_CONFIG = {
+    'type': os.environ.get('PUSH_TYPE', 'pushplus'),  # pushplus | serverchan
+    'pushplus_token': os.environ.get('PUSHPLUS_TOKEN', ''),
+    'serverchan_key': os.environ.get('SERVERCHAN_KEY', ''),
 }
 
 
@@ -399,6 +454,19 @@ API_CONFIG = {
     'reload': True,  # 开发热重载，生产部署建议关闭
 }
 
+# 跨域（CORS）白名单：允许访问的源，逗号分隔，可用环境变量 CORS_ORIGINS 覆盖。
+# 默认放行 Vue 开发服务器(5173) 与前端静态站(8002)。生产部署时可改为实际前端域名。
+# 注意：allow_credentials=True 时禁用 '*'，必须显式列出源，因此集中在此维护。
+CORS_ORIGINS = [
+    _o.strip()
+    for _o in os.environ.get(
+        'CORS_ORIGINS',
+        'http://localhost:5173,http://127.0.0.1:5173,'
+        'http://localhost:8002,http://127.0.0.1:8002',
+    ).split(',')
+    if _o.strip()
+]
+
 
 # ============================================================
 # 11. 认证与角色权限配置（阶段2 · 登录/角色管理）
@@ -443,15 +511,49 @@ ROLES = {
     },
 }
 
+_DEFAULT_SECRET = 'carbon-factory-dev-secret-change-me'
+
 AUTH_CONFIG = {
     # 令牌签名密钥（生产务必通过环境变量 AUTH_SECRET_KEY 覆盖，勿硬编码到仓库）
-    'secret_key': os.environ.get('AUTH_SECRET_KEY', 'carbon-factory-dev-secret-change-me'),
+    'secret_key': os.environ.get('AUTH_SECRET_KEY', _DEFAULT_SECRET),
     # 签名算法标识（令牌负载中记录，便于将来扩展非对称算法）
     'algorithm': 'HS256',
     # 访问令牌有效期（秒），默认 8 小时；可用 AUTH_TOKEN_EXPIRE 覆盖
     'access_token_expire_seconds': int(os.environ.get('AUTH_TOKEN_EXPIRE', 8 * 3600)),
     # 密码 PBKDF2-HMAC-SHA256 迭代次数
     'pbkdf2_iterations': 100_000,
+}
+
+# 生产安全护栏：生产环境若使用默认/空密钥，直接拒绝启动，防止 JWT 令牌被伪造
+if os.environ.get('APP_ENV', '').lower() == 'production':
+    if not AUTH_CONFIG['secret_key'] or AUTH_CONFIG['secret_key'] == _DEFAULT_SECRET:
+        raise RuntimeError(
+            '生产环境(APP_ENV=production)必须通过 AUTH_SECRET_KEY 设置独立随机密钥，'
+            '禁止使用默认密钥或留空'
+        )
+# 开发环境使用默认密钥时给出醒目警告
+elif AUTH_CONFIG['secret_key'] == _DEFAULT_SECRET:
+    warnings.warn(
+        'AUTH_SECRET_KEY 未配置，正在使用开发默认密钥，JWT 令牌可被伪造；'
+        '生产部署务必通过环境变量设置 AUTH_SECRET_KEY',
+        RuntimeWarning,
+        stacklevel=2,
+    )
+
+
+# ============================================================
+# 11b. 历史存储归档配置（3 年留存 + 高效时序查询）
+# ============================================================
+# 分层存储策略：分钟级原始数据仅保留近 retention_raw_days 天，
+# 过期后降采样为「小时 / 天」统计桶写入 time_series_archive，
+# 归档数据保留 retention_archive_years 年，超出后清理。
+ARCHIVE_CONFIG = {
+    # 分钟级原始数据保留天数（超过则滚动归档并删除原始行）
+    'retention_raw_days': int(os.environ.get('ARCHIVE_RAW_DAYS', 30)),
+    # 归档数据保留年限（3 年），超过后从归档表清除
+    'retention_archive_years': int(os.environ.get('ARCHIVE_YEARS', 3)),
+    # 后台归档调度间隔（小时）；亦可通过 POST /api/history/archive 手动触发
+    'archive_interval_hours': int(os.environ.get('ARCHIVE_INTERVAL_HOURS', 24)),
 }
 
 
@@ -476,6 +578,10 @@ settings = {
     'CARBON_FACTORS': CARBON_FACTORS,
     'MODEL_CONFIG': MODEL_CONFIG,
     'THRESHOLD_CONFIG': THRESHOLD_CONFIG,
+    'SEVERITY_LEVELS': SEVERITY_LEVELS,
+    'SEVERITY_LABELS': SEVERITY_LABELS,
+    'ALERT_CONFIG': ALERT_CONFIG,
     'ROLES': ROLES,
     'AUTH_CONFIG': AUTH_CONFIG,
+    'ARCHIVE_CONFIG': ARCHIVE_CONFIG,
 }

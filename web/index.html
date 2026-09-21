@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>碳排AI监测系统 · 数字孪生锂电工厂</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+  <style>
+    body{background:#f5f6f8;font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+    .navbar-brand{font-weight:700}
+    .card{border:none;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+    .card-title{font-size:14px;font-weight:600;color:#374151;padding:14px 16px 0}
+    .chart{height:340px}
+    .kpi{border-left:4px solid #10b981;padding:16px 20px}
+    .kpi .label{font-size:12px;color:#6b7280}
+    .kpi .value{font-size:24px;font-weight:700;color:#0f766e}
+    .kpi .sub{font-size:12px;color:#9ca3af}
+    .metric{padding:18px 20px}
+    .metric .label{font-size:12px;color:#6b7280}
+    .metric .value{font-size:26px;font-weight:700;color:#0f766e}
+    .metric .unit{font-size:12px;color:#9ca3af}
+    .badge-run{background:#10b981}
+    .badge-standby{background:#f59e0b}
+    .badge-stop{background:#6b7280}
+    .report-head{color:#0f766e}
+    .preview table{font-size:13px}
+    .preview th{background:#0f766e;color:#fff;white-space:nowrap}
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

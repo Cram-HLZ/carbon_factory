@@ -1,0 +1,27 @@
+# 不进入 Docker 构建上下文的文件/目录
+.git
+.vscode
+env
+.venv
+venv
+__pycache__
+*.pyc
+
+# 前端依赖与构建产物（镜像内重新安装/构建）
+web/node_modules
+web/dist
+
+# 数据库与本地数据
+*.db
+*.sqlite
+*.sqlite3
+data/raw_data
+data/process_data
+
+# 模型权重 / 日志 / 图表（通过卷挂载，不打包进镜像）
+output/model_weight
+output/log
+output/chart
+
+# 敏感凭据
+.env

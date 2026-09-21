@@ -17,24 +17,30 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from config.settings import CORS_ORIGINS
+
 from backend.routes import router as backend_router
 from backend.ingestion import router as ingestion_router
 from backend.auth import router as auth_router
+from backend.websocket import router as websocket_router
+from backend.alarm_routes import router as alarm_router
+from backend.report_routes import router as report_router
+from backend.history_routes import router as history_router
+from backend import archive_loop, detection_loop
 
 app = FastAPI(
-    title='碳排监测系统 - 后端服务（阶段1脚手架）',
+    title='碳排监测系统 - 后端服务',
     description=(
-        'HTTP 转发算法服务（8000）+ 业务组装起点。'
-        '阶段1 全部为透传转发；阶段2 接数据库/认证/告警推送。'
+        'HTTP 转发算法服务（8000）+ 数据采集 + 认证 + WebSocket 实时告警推送。'
     ),
-    version='0.1.0',
+    version='0.2.0',
 )
 
-# CORS 全开（联调期）：前端直连后端 8001 不受浏览器同源限制
-# 上线前改为前端域名白名单，如 ['http://localhost:5173', 'https://your-frontend.com']
+# CORS 白名单（config.settings.CORS_ORIGINS）：默认放行 Vue 开发服务器(5173) 与
+# 前端静态站(8002)，可用环境变量 CORS_ORIGINS 覆盖为实际前端域名
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['*'],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*'],
@@ -46,6 +52,27 @@ app.include_router(backend_router)
 app.include_router(ingestion_router)
 # 挂载认证与角色管理路由（登录 / 权限 / 用户管理）
 app.include_router(auth_router)
+# 挂载告警管理路由（历史查询 / 处理状态 / 手动扫描）
+app.include_router(alarm_router)
+# 挂载报表中心路由（月度碳排报告 / 溯源台账 / 降碳成效对比，导出 PDF/Excel）
+app.include_router(report_router)
+# 挂载历史时序路由（单设备时序查询 / 手动归档）
+app.include_router(history_router)
+# 挂载 WebSocket 实时推送端点（/ws/alerts）
+app.include_router(websocket_router)
+
+
+# 启动后台告警检测循环 / 历史归档调度 / 停止时优雅退出
+@app.on_event('startup')
+async def on_startup():
+    await detection_loop.start()
+    await archive_loop.start()
+
+
+@app.on_event('shutdown')
+async def on_shutdown():
+    await detection_loop.stop()
+    await archive_loop.stop()
 
 
 @app.get('/', summary='后端根信息')

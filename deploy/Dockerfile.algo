@@ -1,0 +1,15 @@
+# 算法服务镜像（FastAPI :8000，YOLO/LSTM）
+# 需要 GPU 推理时，把基础镜像换成 nvidia/cuda:12.x-runtime 并确保 torch 为 GPU 版
+FROM python:3.13-slim
+WORKDIR /app
+
+COPY requirements-base.txt requirements-algo.txt ./
+# 先装 CPU 版 torch，避免默认从 PyPI 拉取携带 CUDA 的巨量体积（Windows/Linux 通用）
+RUN pip install --no-cache-dir torch==2.13.0 --index-url https://download.pytorch.org/whl/cpu
+# torch 已在上面以 +cpu 版装好，此处 requirements-algo.txt 中的 torch==2.13.0 会被判定为已满足（PEP 440 忽略 local 标签），不会重复拉取
+RUN pip install --no-cache-dir -r requirements-base.txt -r requirements-algo.txt
+
+COPY . .
+
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

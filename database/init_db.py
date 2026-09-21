@@ -13,7 +13,7 @@ init_db —— 数据库初始化入口
 from __future__ import annotations
 
 from database.database import DATABASE_URL, engine, init_database
-from database.models import AlarmRecord, Equipment, Strategy, TimeSeriesData, User
+from database.models import AlarmRecord, Equipment, Strategy, TimeSeriesArchive, TimeSeriesData, User
 from database.seed import DEFAULT_USERS, seed_equipment, seed_users
 from sqlalchemy import text
 
@@ -26,7 +26,7 @@ def main() -> None:
 
     # 1. 建表
     init_database()
-    print('\n[1/4] 建表完成（equipment / time_series_data / alarm_record / strategy / user）')
+    print('\n[1/4] 建表完成（equipment / time_series_data / time_series_archive / alarm_record / strategy / user）')
 
     # 2. 灌入设备表种子数据
     added = seed_equipment()
@@ -43,6 +43,7 @@ def main() -> None:
     tables = {
         'equipment（设备表）': Equipment,
         'time_series_data（时序数据表）': TimeSeriesData,
+        'time_series_archive（归档表）': TimeSeriesArchive,
         'alarm_record（告警记录表）': AlarmRecord,
         'strategy（方案表）': Strategy,
         'user（用户表）': User,
