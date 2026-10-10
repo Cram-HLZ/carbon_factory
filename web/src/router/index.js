@@ -28,11 +28,15 @@ const router = createRouter({
 router.beforeEach((to) => {
   const auth = useAuthStore()
   if (to.meta.public) {
-    // 已登录访问登录页 → 直接进总览
-    if (auth.isLogin) return { path: '/overview' }
+    // 已登录且令牌未过期访问登录页 → 直接进总览
+    if (auth.isLogin && !auth.isTokenExpired) return { path: '/overview' }
     return true
   }
-  if (!auth.isLogin) return { path: '/login' }
+  // 未登录或令牌已过期 → 清会话并回登录页（避免进入受保护页后才因 401 被踢）
+  if (!auth.isLogin || auth.isTokenExpired) {
+    auth.clear()
+    return { path: '/login' }
+  }
   if (to.meta.adminOnly && !auth.isAdmin) return { path: '/overview' }
   return true
 })

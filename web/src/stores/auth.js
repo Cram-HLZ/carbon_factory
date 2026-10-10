@@ -10,6 +10,17 @@ function readUser() {
   catch (e) { return null }
 }
 
+// 解析 JWT 负载（第二段 base64url），无法解析时返回 null
+function readTokenPayload(token) {
+  try {
+    const seg = token.split('.')[1]
+    if (!seg) return null
+    const b64 = seg.replace(/-/g, '+').replace(/_/g, '/')
+    const pad = b64 + '='.repeat((4 - (b64.length % 4)) % 4)
+    return JSON.parse(atob(pad))
+  } catch (e) { return null }
+}
+
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     token: localStorage.getItem(TOKEN_KEY) || '',
@@ -17,6 +28,12 @@ export const useAuthStore = defineStore('auth', {
   }),
   getters: {
     isLogin: (s) => !!s.token,
+    isTokenExpired: (s) => {
+      if (!s.token) return true
+      const p = readTokenPayload(s.token)
+      if (!p || !p.exp) return true
+      return p.exp * 1000 <= Date.now()
+    },
     role: (s) => (s.user && s.user.role) || '',
     account: (s) => (s.user && s.user.account) || '',
     isAdmin: (s) => s.user && s.user.role === 'it_admin',

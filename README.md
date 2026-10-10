@@ -241,6 +241,9 @@ DATABASE_URL=mysql+pymysql://user:password@localhost:3306/carbon_factory
 ```
 carbon_factory/
 ├── main.py                    # 算法服务入口 + 一键启动全站
+├── test_api.py                # 算法接口自动化验证脚本（8000 全端点）
+├── test_alarm_ws.py           # 告警弹窗 WebSocket 链路测试脚本（8001 推送验证）
+├── test_scaler_io.py          # scaler 保存/加载单元测试
 ├── config/settings.py         # 全局配置（碳排因子/超参/设备清单/角色/认证）
 ├── api_server/                # 算法服务 API 层（/api/v1）
 ├── Lstm_model/                # LSTM 异常检测模型（训练/推理/阈值/评估）
@@ -264,7 +267,8 @@ carbon_factory/
 │   ├── history_routes.py      # 历史时序/归档查询
 │   ├── detection_loop.py      # 后台异常检测循环
 │   ├── notifier.py            # 多渠道通知（WebSocket/邮件/移动端）
-│   └── websocket.py           # WebSocket 连接管理
+│   ├── websocket.py           # WebSocket 连接管理
+│   └── test_backend.py        # 后端→算法链路验证脚本（8001 转发验收）
 ├── collector/                 # 采集入写服务（落库 + 碳排核算 + 模拟器）
 ├── database/                  # 数据库（模型/连接/建表/种子）
 ├── web/                       # 前端源码（Vue3 + Vite SPA，8002 serve 构建产物 dist/）
@@ -285,7 +289,31 @@ carbon_factory/
 
 ***
 
-## 九、训练 LSTM 模型（可选）
+## 九、测试与验证
+
+项目提供 4 个「运行即验证」的独立测试脚本（均为 `python xxx.py` 手动运行，不进入生产链路）：
+
+| 脚本 | 位置 | 作用 | 前置条件 |
+| ---- | ---- | ---- | ---- |
+| `test_api.py` | 根目录 | 算法服务(8000) 9 个端点自动化验证，核对 HTTP 状态 + 业务 code + 返回字段 | 启动算法服务 |
+| `backend/test_backend.py` | backend/ | 后端(8001)→算法(8000) 整条转发链路验证，模拟前端视角打后端 | 启动算法 + 后端 |
+| `test_alarm_ws.py` | 根目录 | 告警中心「实时弹窗」链路：模拟前端 WebSocket 订阅 /ws/alerts，注入异常工况触发扫描，验证实时广播告警 | 启动算法 + 后端；`pip install websocket-client` |
+| `test_scaler_io.py` | 根目录 | LSTM scaler 保存/加载最小单元测试（临时目录，不污染模型权重） | 无 |
+
+常用命令：
+
+```bash
+python test_api.py                        # 先起算法服务 8000
+python backend/test_backend.py            # 算法 8000 + 后端 8001
+python test_alarm_ws.py --eq I-9-01       # 告警弹窗链路
+python test_scaler_io.py                  # scaler 单元测试
+```
+
+> 告警测试提示：同设备 10 分钟冷却（`alert_cooldown_seconds=600`），连续跑需重启算法服务(8000)重置冷却，或更换 `--eq`。
+
+***
+
+## 十、训练 LSTM 模型（可选）
 
 > 未训练模型时，`/anomaly/detect` 会退化为统计偏离度检测（`threshold_type="fallback"`），不影响联调。联调通过后建议为高耗能设备单独训练。
 
@@ -303,7 +331,7 @@ python -m Lstm_model.train --equipment_id I-9-01 --epochs 30
 
 ***
 
-## 十、关键配置
+## 十一、关键配置
 
 修改这些常量即可调整行为，**不需要动业务代码**（均在 [config/settings.py](config/settings.py)）：
 
@@ -322,7 +350,7 @@ python -m Lstm_model.train --equipment_id I-9-01 --epochs 30
 
 ***
 
-## 十一、代码规范
+## 十二、代码规范
 
 * **格式化**：保存自动格式化，4 空格缩进，单引号（团队 `.vscode/settings.json` 已统一）
 
@@ -338,7 +366,7 @@ python -m Lstm_model.train --equipment_id I-9-01 --epochs 30
 
 ***
 
-## 十二、联系方式
+## 十三、联系方式
 
 * 算法负责人：队长（算法）
 

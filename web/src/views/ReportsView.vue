@@ -121,11 +121,13 @@ function config(key) {
     }
   }
   if (key === 'trace') {
-    const base = {
-      equipment_id: trace.equipmentId,
-      start_time: padSeconds(trace.start),
-      end_time: padSeconds(trace.end),
-    }
+    // 未填写的条件不传参，避免空串被后端解析成非法 datetime（422）
+    const base = {}
+    if (trace.equipmentId) base.equipment_id = trace.equipmentId
+    const s = padSeconds(trace.start)
+    const e = padSeconds(trace.end)
+    if (s) base.start_time = s
+    if (e) base.end_time = e
     return {
       path: '/report/traceability',
       jsonParams: base,
