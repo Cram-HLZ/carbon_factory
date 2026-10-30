@@ -8,12 +8,17 @@ let timer = null
 let subscriber = null
 
 function onAlarm(a) {
+  const feats = (a.feature_contributions || [])
+    .slice(0, 3)
+    .map(f => `${f.feature_name || f.feature} ${Math.round((f.contribution || 0) * 100)}%`)
+    .join(' · ')
   pushToast({
     variant: SEVERITY_COLOR[a.severity] || 'secondary',
     title: `⚠ ${a.equipment_name || a.equipment_id} · ${SEVERITY_LABEL[a.severity] || a.severity}级告警`,
     lines: [
       `设备 ${a.equipment_id} · 异常得分 ${a.anomaly_score == null ? '—' : a.anomaly_score}`,
       a.root_cause || '',
+      feats ? `Top 特征：${feats}` : '',
       a.alarm_time || '',
     ].filter(Boolean),
   })

@@ -41,6 +41,7 @@ from sqlalchemy.orm import Session
 from config.settings import (
     ALERT_CONFIG,
     ARCHIVE_CONFIG,
+    CARBON_FACTORS,
     EQUIPMENT_LIST,
     EQUIPMENT_TYPES,
     TEAMS,
@@ -443,3 +444,192 @@ def savings_comparison(equipment_ids: Optional[List[str]] = None) -> dict:
         },
     ]
     return _report('降碳成效对比表', f'共 {len(equipment_ids)} 台设备', sections)
+
+
+# ============================================================
+# ④ MRV 碳排放核查报告（监测-报告-核查闭环）
+# ============================================================
+# 范围划分（GHG Protocol / ISO 14064-1）：
+#   范围1 直接排放   —— 厂内化石燃料燃烧（本项目设备均为电力驱动，无该排放，记 0）
+#   范围2 外购间接   —— 外购电力/热力（本项目主体，等于全部设备碳排汇总）
+#   范围3 其他间接   —— 供应链/运输等（本期未核算，标 N/A）
+_MRV_METHODOLOGY = 'GHG Protocol / ISO 14064-1 排放因子法'
+
+# 排放因子清单：数值来自 config.settings.CARBON_FACTORS
+_FACTOR_META = [
+    ('electricity', '电力', 'kgCO₂/kWh', '中国南方电网区域平均排放因子'),
+    ('natural_gas', '天然气', 'kgCO₂/m³', 'IPCC 2006 缺省值'),
+    ('coal', '煤炭', 'kgCO₂/kg', 'IPCC 2006 缺省值'),
+    ('diesel', '柴油', 'kgCO₂/L', 'IPCC 2006 缺省值'),
+    ('compressed_air', '压缩空气', 'kgCO₂/m³', '按空压机耗电折算的估算值'),
+]
+
+
+def mrv_metrics(db: Session, year: int, month: int) -> dict:
+    """计算 MRV 核算指标：范围1/2/3 排放、数据质量评分、覆盖率等。
+
+    排放均来自 time_series_data.carbon_emission（已按 power/60 × 因子算好入库），
+    本项目设备全部为电力驱动，故范围2 = 全部碳排，范围1 = 0，范围3 不适用。
+    """
+    start = datetime(year, month, 1)
+    end = datetime(year, month + 1, 1) if month < 12 else datetime(year + 1, 1, 1)
+
+    daily_rows = _collect_daily(db, start, end)
+    eq_map = {e.equipment_id: e for e in db.query(Equipment).all()}
+
+    total_carbon = sum(r['carbon'] for r in daily_rows)
+    total_energy = sum(r['energy'] for r in daily_rows)
+    total_samples = sum(r['samples'] for r in daily_rows)
+
+    active = {r['equipment_id'] for r in daily_rows}
+    registered = len(eq_map) or 1
+    coverage = len(active) / registered
+    score = round(coverage * 100, 1)
+
+    ws_carbon: dict = {}
+    for r in daily_rows:
+        eq = eq_map.get(r['equipment_id'])
+        ws = eq.workshop_id if eq else r['equipment_id']
+        ws_carbon[ws] = ws_carbon.get(ws, 0.0) + r['carbon']
+    by_workshop = sorted(ws_carbon.items(), key=lambda x: x[1], reverse=True)
+
+    return {
+        'period': f'{year:04d}-{month:02d}',
+        'scope1': 0.0,
+        'scope2': total_carbon,
+        'scope3': None,
+        'total_carbon': total_carbon,
+        'total_energy': total_energy,
+        'total_samples': total_samples,
+        'active_count': len(active),
+        'registered': registered,
+        'coverage': coverage,
+        'data_quality_score': score,
+        'by_workshop': by_workshop,
+    }
+
+
+def build_mrv_report(m: dict) -> dict:
+    """由 mrv_metrics 结果渲染规范化 MRV 报告结构（供 JSON/Excel/PDF 复用）"""
+    sections: List[dict] = []
+
+    sections.append({
+        'heading': '一、核算边界与方法学',
+        'tables': [_table(
+            ['项目', '内容'],
+            [
+                ['报告期', m['period']],
+                ['组织边界', '单体工厂（电芯制造基地）'],
+                ['运营边界', '生产车间 + 物流动力区内全部在用设备（按用电核算）'],
+                ['核算方法学', _MRV_METHODOLOGY],
+                ['排放因子来源', 'IPCC 2006 Guidelines + 中国南方电网区域平均排放因子'],
+                ['活动数据来源', '设备分钟级功率数据（time_series_data 自动采集）'],
+            ],
+        )],
+    })
+
+    sections.append({
+        'heading': '二、温室气体排放汇总（范围 1 / 2 / 3）',
+        'tables': [_table(
+            ['范围', '类别', '排放量 (kgCO₂)'],
+            [
+                ['范围 1', '直接排放（化石燃料燃烧）', _fnum(m['scope1'])],
+                ['范围 2', '外购电力间接排放', _fnum(m['scope2'])],
+                ['范围 3', '其他间接排放', '不适用（本期未核算）'],
+                ['合计', '范围 1 + 范围 2', _fnum(m['total_carbon'])],
+            ],
+        )],
+    })
+
+    sections.append({
+        'heading': '三、分车间排放明细（范围 2）',
+        'tables': [_table(
+            ['车间', '碳排 (kgCO₂)'],
+            [[_workshop_name(ws), _fnum(c)] for ws, c in m['by_workshop']],
+        )],
+    })
+
+    factor_rows = [
+        [code, name, _fnum(CARBON_FACTORS.get(code)), unit, source]
+        for code, name, unit, source in _FACTOR_META
+    ]
+    sections.append({
+        'heading': '四、排放因子清单',
+        'tables': [_table(
+            ['因子代码', '能源类型', '因子值', '单位', '来源'],
+            factor_rows,
+        )],
+    })
+
+    uncertainty = (
+        f'本期覆盖 {m["active_count"]}/{m["registered"]} 台在册设备，'
+        f'共 {m["total_samples"]} 条分钟级采样记录；数据质量评分受设备覆盖率主导。'
+    )
+    sections.append({
+        'heading': '五、数据质量与不确定性分析',
+        'tables': [_table(
+            ['指标', '数值'],
+            [
+                ['在册设备数', str(m['registered'])],
+                ['有数据设备数', str(m['active_count'])],
+                ['设备覆盖率', f"{m['coverage'] * 100:.1f}%"],
+                ['分钟级采样记录数', str(m['total_samples'])],
+                ['数据质量评分', f"{m['data_quality_score']} / 100"],
+                ['不确定性说明', uncertainty],
+            ],
+        )],
+    })
+
+    sections.append({
+        'heading': '六、核查声明',
+        'tables': [_table(
+            ['项目', '内容'],
+            [
+                ['核查状态', '待核查（draft）'],
+                ['核查人', '——（第三方核查后签署）'],
+                ['核查结论', '——'],
+                ['说明', '本报告由系统自动核算生成，排放因子与方法学需第三方核查确认后方可用于对外申报。'],
+            ],
+        )],
+    })
+
+    return _report('MRV 碳排放核查报告', m['period'], sections)
+
+
+def mrv_workbook(db: Session, year: int, month: int) -> dict:
+    """核算底稿：逐设备 × 逐日 的活动数据与碳排放明细，供第三方核查逐条追溯。
+
+    复用 _collect_daily（跨原始表 + 归档表），一行 = 一台设备一天的核算依据。
+    """
+    start = datetime(year, month, 1)
+    end = datetime(year, month + 1, 1) if month < 12 else datetime(year + 1, 1, 1)
+
+    daily_rows = _collect_daily(db, start, end)
+    eq_map = {e.equipment_id: e for e in db.query(Equipment).all()}
+    daily_rows.sort(key=lambda r: (r['equipment_id'], r['day']))
+
+    rows = []
+    for r in daily_rows:
+        eq = eq_map.get(r['equipment_id'])
+        rows.append([
+            r['equipment_id'],
+            eq.equipment_name if eq else r['equipment_id'],
+            eq.workshop_id if eq else '—',
+            r['day'],
+            _fnum(r['carbon']),
+            _fnum(r['energy']),
+            (_fnum(float(r['load']) * 100, 1) + '%') if r['load'] is not None else '—',
+            _fnum(float(r['temp']), 1) if r['temp'] is not None else '—',
+            str(r['samples']),
+        ])
+
+    sections = [{
+        'heading': '活动数据与排放明细（逐设备 × 逐日）',
+        'tables': [_table(
+            ['设备ID', '设备名称', '车间', '日期', '碳排(kgCO₂)', '能耗(kWh)',
+             '平均负载率', '平均温度(℃)', '采样数'],
+            rows,
+        )],
+    }]
+
+    return _report('MRV 核算底稿', f'{year:04d}-{month:02d} · 共 {len(rows)} 条记录', sections)

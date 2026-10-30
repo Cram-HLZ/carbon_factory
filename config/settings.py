@@ -143,6 +143,44 @@ MOBILE_PUSH_CONFIG = {
 
 
 # ============================================================
+# 4d. 工业协议与边缘网关接入配置（Modbus / OPC UA / MQTT）
+# ============================================================
+# 真实地址通过项目根目录 .env 提供；未配置时用本机默认值。
+# 协议客户端库（pymodbus / opcua / paho-mqtt）按需懒加载，未安装时网关自动降级并提示。
+PROTOCOL_CONFIG = {
+    'modbus': {
+        'host': os.environ.get('MODBUS_HOST', '127.0.0.1'),
+        'port': int(os.environ.get('MODBUS_PORT', '502')),
+        'unit': int(os.environ.get('MODBUS_UNIT', '1')),
+    },
+    'opcua': {
+        'endpoint': os.environ.get('OPCUA_ENDPOINT', 'opc.tcp://127.0.0.1:4840'),
+    },
+    'mqtt': {
+        'host': os.environ.get('MQTT_HOST', '127.0.0.1'),
+        'port': int(os.environ.get('MQTT_PORT', '1883')),
+        'topic': os.environ.get('MQTT_TOPIC', 'carbon_factory/+/reading'),
+        'client_id': os.environ.get('MQTT_CLIENT_ID', 'carbon_gateway'),
+        'keepalive': int(os.environ.get('MQTT_KEEPALIVE', '60')),
+    },
+}
+
+
+# ============================================================
+# 4e. 分项计量映射（照明 / 空调 / 动力 / 产线）
+# ============================================================
+# key = equipment_type（见下方 EQUIPMENT_TYPES），value = 分项。
+# 未命中时默认归入「产线」；若后续新增照明计量点，在此把 type 映射到「照明」即可。
+SUBMETER_CATEGORIES = ['照明', '空调', '动力', '产线']
+SUBMETER_MAP = {
+    'chiller': '空调',
+    'cooling_fan': '空调',
+    'compressor': '动力',
+    # 'lighting': '照明',  # 预留：新增照明计量点时开启
+}
+
+
+# ============================================================
 # 5. 设备类型配置（基于《设备清单.xlsx》9类生产设备 + 3类公用动力）
 # ============================================================
 # key = equipment_type 标识
@@ -426,6 +464,24 @@ WORKSHOPS = {
     'WS-04': {'name': '模具加工车间', 'equipment_count': 4},
     'WS-05': {'name': '物流动力区', 'equipment_count': 11},
 }
+
+
+# ============================================================
+# 7b. 组织层级（集团 → 工厂 → 车间）与数据范围
+# ============================================================
+# 三级组织树：解决「单组织、无集团-工厂-车间多层级」的问题，
+# 支撑多租户下的组织级数据隔离与权限（见 backend.security.visible_workshops）。
+ORGANIZATION_TREE = {
+    'name': '锂能智造集团',
+    'code': 'ORG-LINENG',
+    'factories': [
+        {'code': 'F-01', 'name': '华南一厂（电芯基地）', 'workshops': ['WS-01', 'WS-02', 'WS-03']},
+        {'code': 'F-02', 'name': '华南二厂（模组基地）', 'workshops': ['WS-04', 'WS-05']},
+    ],
+}
+
+# 数据范围粒度：all=全集团（跨工厂）/ factory=单工厂 / workshop=单车间（组织级权限）
+DATA_SCOPES = ['all', 'factory', 'workshop']
 
 
 # ============================================================

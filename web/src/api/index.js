@@ -30,6 +30,10 @@ export const deleteAlarm = (id) => http.delete(`/alarms/${id}`).then(r => r.data
 export const batchDeleteAlarms = (ids) => http.delete('/alarms', { params: { ids: ids.join(',') } }).then(r => r.data)
 export const scanAlarms = () => http.post('/alarms/scan').then(r => r.data)
 
+// ==================== 分项计量 ====================
+export const getSubmeterSummary = (params) =>
+  http.get('/ingest/submeter/summary', { params }).then(r => r.data)
+
 // ==================== 报表 ====================
 export const reportMonthly = (year, month) =>
   http.get('/report/monthly', { params: { year, month, format: 'json' } }).then(r => r.data)
@@ -37,6 +41,8 @@ export const reportTraceability = (params) =>
   http.get('/report/traceability', { params: { ...params, format: 'json' } }).then(r => r.data)
 export const reportSavings = () =>
   http.get('/report/savings', { params: { format: 'json' } }).then(r => r.data)
+export const reportMrv = (year, month) =>
+  http.get('/report/mrv', { params: { year, month, format: 'json' } }).then(r => r.data)
 
 // 报表导出：拉取 excel/pdf 二进制流并解析文件名
 export async function downloadReport(path, params, fallbackName) {

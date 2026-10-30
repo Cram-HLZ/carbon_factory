@@ -78,6 +78,10 @@ class AnomalyDetectResponse(BaseModel):
     timestamp: datetime
     threshold_type: str = Field('adaptive', description='阈值来源：lstm/fallback/adaptive/fixed')
     should_alert: bool = Field(False, description='是否应推送告警（已含10分钟冷却控制）')
+    feature_contributions: Optional[List[Dict[str, Any]]] = Field(
+        None,
+        description='可解释性：逐特征重建误差贡献（降序 top-N），每项含 feature/feature_name/reconstruction_error/contribution',
+    )
 
 
 # ============================================================

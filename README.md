@@ -297,7 +297,7 @@ carbon_factory/
 | ---- | ---- | ---- | ---- |
 | `test_api.py` | 根目录 | 算法服务(8000) 9 个端点自动化验证，核对 HTTP 状态 + 业务 code + 返回字段 | 启动算法服务 |
 | `backend/test_backend.py` | backend/ | 后端(8001)→算法(8000) 整条转发链路验证，模拟前端视角打后端 | 启动算法 + 后端 |
-| `test_alarm_ws.py` | 根目录 | 告警中心「实时弹窗」链路：模拟前端 WebSocket 订阅 /ws/alerts，注入异常工况触发扫描，验证实时广播告警 | 启动算法 + 后端；`pip install websocket-client` |
+| `test_alarm_ws.py` | 根目录 | 告警中心「实时弹窗」链路：模拟前端 WebSocket 订阅 /ws/alerts，注入异常工况触发扫描，验证实时广播告警（纯标准库手写 WS 客户端） | 启动算法 + 后端 |
 | `test_scaler_io.py` | 根目录 | LSTM scaler 保存/加载最小单元测试（临时目录，不污染模型权重） | 无 |
 
 常用命令：

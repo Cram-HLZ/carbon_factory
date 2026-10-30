@@ -26,6 +26,7 @@ import torch
 from sklearn.preprocessing import MinMaxScaler
 
 from config.settings import MODEL_CONFIG, MODEL_WEIGHT_DIR
+from feature_engineer.feature_extractor import FEATURE_COLUMNS, FEATURE_DISPLAY_NAMES
 from feature_engineer.sequence_builder import SequenceBuilder
 from Lstm_model.model import LSTMAutoencoder
 
@@ -107,6 +108,39 @@ class ModelPredictor:
         recon = self.model(tensor)
         mse = torch.mean((tensor - recon) ** 2).item()
         return float(mse)
+
+    # ---------------- 可解释性：逐特征重建误差 → top 特征贡献 ----------------
+    @torch.no_grad()
+    def explain_contributions(self, sequence: np.ndarray, top_k: int = 8) -> List[Dict]:
+        """
+        把「黑盒」变「可解释」：计算每个特征的绝对重建误差 |x - x̂|，
+        沿时间轴取均值后归一化为贡献占比（百分比），按降序返回 top_k。
+
+        Parameters
+        ----------
+        sequence : (1, seq_len, F) 或 (seq_len, F)，已归一化
+        top_k : 返回贡献最大的特征数，默认 8（全量）
+
+        Returns
+        -------
+        List[Dict]，每项含 feature / feature_name / reconstruction_error / contribution
+        """
+        tensor = self._to_tensor(sequence)
+        recon = self.model(tensor)
+        # 逐特征绝对重建误差，沿时间轴求均值 → (1, F)
+        err = torch.mean(torch.abs(tensor - recon), dim=1)[0].cpu().numpy()
+        total = float(err.sum())
+        contributions: List[Dict] = []
+        for i, feat in enumerate(FEATURE_COLUMNS):
+            share = float(err[i] / total) if total > 0 else 0.0
+            contributions.append({
+                'feature': feat,
+                'feature_name': FEATURE_DISPLAY_NAMES.get(feat, feat),
+                'reconstruction_error': float(err[i]),
+                'contribution': round(share, 4),
+            })
+        contributions.sort(key=lambda x: x['contribution'], reverse=True)
+        return contributions[:top_k]
 
     # ---------------- 批量推理 ----------------
     @torch.no_grad()

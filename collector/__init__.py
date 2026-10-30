@@ -13,6 +13,14 @@ collector —— 数据采集层（对接 MES / EMS / PLC 传感器）
 """
 
 from collector.service import IngestionService
-from collector.schemas import SensorReading, SensorBatch, IngestResult
+from collector.schemas import SensorReading, SensorBatch, IngestResult, GatewayIngestRequest
+from collector.gateway import EdgeGateway
 
-__all__ = ['IngestionService', 'SensorReading', 'SensorBatch', 'IngestResult']
+__all__ = [
+    'IngestionService',
+    'SensorReading',
+    'SensorBatch',
+    'IngestResult',
+    'GatewayIngestRequest',
+    'EdgeGateway',
+]

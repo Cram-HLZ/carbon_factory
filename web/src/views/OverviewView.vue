@@ -24,12 +24,16 @@
       <div class="col-lg-6"><div class="card"><div class="card-title">高碳排设备 Top10</div><div ref="topEl" class="chart"></div></div></div>
       <div class="col-lg-6"><div class="card"><div class="card-title">按小时碳排趋势</div><div ref="trendEl" class="chart"></div></div></div>
     </div>
+
+    <div class="row g-3 mt-3">
+      <div class="col-lg-6"><div class="card"><div class="card-title">分项能耗构成（照明 / 空调 / 动力 / 产线）</div><div ref="submeterEl" class="chart"></div></div></div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { getOverview } from '../api'
+import { getOverview, getSubmeterSummary } from '../api'
 import { fmt, TYPE_NAMES } from '../constants'
 import { setConnection } from '../composables/connection'
 import { useEcharts } from '../composables/useEcharts'
@@ -38,10 +42,14 @@ const workshopEl = ref(null)
 const teamEl = ref(null)
 const topEl = ref(null)
 const trendEl = ref(null)
+const submeterEl = ref(null)
 const { setOption: setWorkshop } = useEcharts(workshopEl)
 const { setOption: setTeam } = useEcharts(teamEl)
 const { setOption: setTop } = useEcharts(topEl)
 const { setOption: setTrend } = useEcharts(trendEl)
+const { setOption: setSubmeter } = useEcharts(submeterEl)
+
+const SUBMETER_COLORS = { '照明': '#f59e0b', '空调': '#0ea5e9', '动力': '#ef4444', '产线': '#10b981' }
 
 const data = ref({})
 const alertMsg = ref('')
@@ -121,6 +129,29 @@ function renderTrend(trend) {
   })
 }
 
+function renderSubmeter(cats) {
+  const items = (cats || []).filter(c => (c.energy_kwh || 0) > 0)
+  setSubmeter({
+    tooltip: { trigger: 'item', formatter: '{b}: {c} kWh ({d}%)' },
+    legend: { bottom: 0 },
+    series: [{
+      type: 'pie', radius: ['40%', '68%'],
+      data: items.map(c => ({ name: c.category, value: Math.round(c.energy_kwh * 100) / 100 })),
+      label: { formatter: '{b}\n{d}%' },
+      color: items.map(c => SUBMETER_COLORS[c.category] || '#94a3b8'),
+    }],
+  })
+}
+
+async function loadSubmeter() {
+  try {
+    const d = await getSubmeterSummary()
+    if (d && d.categories) renderSubmeter(d.categories)
+  } catch (e) {
+    // 分项图表非关键路径，失败时静默跳过
+  }
+}
+
 async function load() {
   alertMsg.value = ''
   try {
@@ -132,6 +163,7 @@ async function load() {
     renderTeam(d.by_team || [])
     renderTop(d.by_equipment_top || [])
     renderTrend(d.hourly_trend || [])
+    loadSubmeter()
     if (d.message && (!d.by_workshop || d.by_workshop.length === 0)) showEmpty(d.message)
     setConnection('已连接 · 数据实时', 'text-success')
   } catch (e) {

@@ -15,7 +15,7 @@ schemas —— 采集入站数据模型（对接 MES / EMS / PLC 的接口契约
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -46,3 +46,12 @@ class IngestResult(BaseModel):
     inserted: int = Field(0, description='新增条数')
     updated: int = Field(0, description='更新条数')
     total: int = Field(0, description='处理总条数')
+
+
+class GatewayIngestRequest(BaseModel):
+    """边缘网关协议注入请求（Modbus / OPC UA / MQTT 归一化入口）"""
+
+    protocol: str = Field(..., description='协议：modbus / opcua / mqtt')
+    equipment_id: str = Field(..., description='设备编号，如 I-9-01')
+    raw: Any = Field(..., description='协议原始数据（modbus: {"registers":[...]}；opcua: 节点值dict；mqtt: JSON dict）')
+    timestamp: Optional[datetime] = Field(None, description='采样时间，缺省当前时间')

@@ -41,7 +41,11 @@ from carbon_strategy.strategy_engine import CarbonStrategyEngine
 from carbon_strategy.traceability import TraceabilityAnalyzer
 from feature_engineer.data_cleaner import DataCleaner
 from feature_engineer.data_loader import DataLoader as FeDataLoader
-from feature_engineer.feature_extractor import FeatureExtractor
+from feature_engineer.feature_extractor import (
+    FEATURE_COLUMNS,
+    FEATURE_DISPLAY_NAMES,
+    FeatureExtractor,
+)
 from feature_engineer.sequence_builder import SequenceBuilder
 from Lstm_model.anomaly_detector import AnomalyDetector
 try:
@@ -246,17 +250,26 @@ def detect_anomaly(request) -> Dict:
             }
 
         predictor = _get_predictor(eq_id)
+        contributions: List[Dict] = []
         if predictor is None:
             # 兜底：用统计偏离度作为重建误差
             error = _fallback_reconstruction_error(seq)
             threshold_type = 'fallback'
+            contributions = _fallback_feature_contributions(seq)
         else:
             # 注：根据约定，调用方传入的 sequence_data 已归一化
             # 若没归一化，请改用 predictor.infer_error_with_auto_normalize(seq)
             error = predictor.compute_reconstruction_error(seq)
             threshold_type = 'lstm'
+            try:
+                contributions = predictor.explain_contributions(seq)
+            except Exception as exc:
+                logger.warning(f'explain contributions failed: {exc}')
 
-        result = _anomaly_detector.detect(error, eq_id, timestamp=datetime.now())
+        result = _anomaly_detector.detect(
+            error, eq_id, timestamp=datetime.now(),
+            feature_contributions=contributions or None,
+        )
         result['threshold_type'] = threshold_type
         return result
     except Exception as exc:
@@ -276,6 +289,134 @@ def _fallback_reconstruction_error(sequence: np.ndarray) -> float:
     last = sequence[-1]
     diff = last - baseline
     return float(np.mean(diff ** 2))
+
+
+def _fallback_feature_contributions(sequence: np.ndarray, top_k: int = 8) -> List[Dict]:
+    """
+    无模型时的可解释性兜底：逐特征 |最后一分钟 − 近期基线| 归一化为贡献占比。
+    与 ModelPredictor.explain_contributions 返回结构一致。
+    """
+    if sequence.shape[0] < 6:
+        return []
+    baseline = sequence[:-1].mean(axis=0)
+    err = np.abs(sequence[-1] - baseline)
+    total = float(err.sum())
+    contributions: List[Dict] = []
+    for i, feat in enumerate(FEATURE_COLUMNS):
+        share = float(err[i] / total) if total > 0 else 0.0
+        contributions.append({
+            'feature': feat,
+            'feature_name': FEATURE_DISPLAY_NAMES.get(feat, feat),
+            'reconstruction_error': float(err[i]),
+            'contribution': round(share, 4),
+        })
+    contributions.sort(key=lambda x: x['contribution'], reverse=True)
+    return contributions[:top_k]
+
+
+def _inject_synthetic_anomalies(
+    sequences: np.ndarray,
+    n: int,
+    feature_dim: int,
+    scale: float = 2.0,
+    seed: int = 42,
+) -> np.ndarray:
+    """
+    向正常序列注入合成异常（构建 ground truth）：
+    随机挑样本，对随机一个特征整窗加尖峰并裁剪回 [0,1]。
+    归一化数据被大幅抬升后，模型重建误差会显著增大 → 判为异常。
+    """
+    rng = np.random.RandomState(seed)
+    n = min(int(n), sequences.shape[0])
+    idxs = rng.choice(sequences.shape[0], size=n, replace=False)
+    anoms = sequences[idxs].copy()
+    for a in anoms:
+        feat = int(rng.randint(0, feature_dim))
+        a[:, feat] = a[:, feat] * scale + 0.5
+        np.clip(a, 0.0, 1.0, out=a)
+    return anoms
+
+
+def evaluate_model(equipment_id: str, n_anomalies: Optional[int] = None) -> Dict:
+    """
+    AI 模型评估指标：把无监督异常检测的「黑盒」变可量化评估。
+
+    用「注入式合成异常」构造 ground truth，复用 Lstm_model.evaluate.classification_report
+    计算 accuracy / precision / recall / F1 / 混淆矩阵。
+
+    流程：
+        1. 加载该设备模型 + 训练 scaler
+        2. 用后 20% 正常序列算重建误差分布 → 阈值 = mean + 3σ
+        3. 向正常序列注入合成异常作为正样本
+        4. 以阈值判定预测标签，与真实标签对比输出分类指标
+    """
+    try:
+        if equipment_id not in EQUIPMENT_LIST:
+            return {'error': f'未知 equipment_id: {equipment_id}'}
+
+        # 显式校验模型权重与 scaler 是否就绪（与 ModelPredictor 默认路径一致），
+        # 缺任一个都给出「先训练」的明确提示
+        model_path = MODEL_WEIGHT_DIR / f'lstm_autoencoder_{equipment_id}_best.pth'
+        scaler_path = MODEL_WEIGHT_DIR / f'scaler_{equipment_id}.pkl'
+        missing = [str(p) for p in (model_path, scaler_path) if not p.exists()]
+        if missing:
+            return {
+                'error': f'设备 {equipment_id} 未训练模型，无法评估。缺少文件: {missing}',
+                'hint': f'先运行 python -m Lstm_model.train --equipment_id {equipment_id}',
+            }
+
+        predictor = _get_predictor(equipment_id)
+        if predictor is None:
+            return {
+                'error': f'设备 {equipment_id} 模型存在但加载失败，无法评估。',
+                'hint': '请确认 torch 已安装且权重文件未损坏后重试',
+            }
+        if predictor.scaler is None:
+            return {'error': f'设备 {equipment_id} 未加载 scaler，无法归一化评估数据'}
+
+        df = _data_loader.load_equipment_data(equipment_id)
+        if df.empty:
+            return {'error': f'设备 {equipment_id} 无历史数据'}
+
+        cleaned = _cleaner.clean(df)
+        feats = _extractor.extract(cleaned)
+        X, _ = _builder.build_sequences(feats)
+        if X.shape[0] < 10:
+            return {'error': f'设备 {equipment_id} 数据不足以构建序列（仅 {X.shape[0]} 条）'}
+
+        # 后 20% 作为「正常」测试集（时序顺序，不打乱）
+        _, X_test, _, _ = _builder.train_test_split(X, X, test_size=0.2)
+        flat = X_test.reshape(-1, X_test.shape[-1])
+        X_test_norm = predictor.scaler.transform(flat).reshape(X_test.shape).astype(np.float32)
+
+        f_dim = int(X_test_norm.shape[-1])
+        normal_errors = predictor.predict_batch(X_test_norm)
+        threshold = float(np.mean(normal_errors) + 3.0 * np.std(normal_errors))
+        threshold = max(threshold, 1e-6)
+
+        n_anom = n_anomalies or max(3, int(len(X_test_norm) * 0.3))
+        anom_norm = _inject_synthetic_anomalies(X_test_norm, n_anom, f_dim)
+        anom_errors = predictor.predict_batch(anom_norm)
+
+        all_errors = np.concatenate([normal_errors, anom_errors])
+        y_true = [0] * len(normal_errors) + [1] * len(anom_errors)
+        y_pred = [1 if float(e) > threshold else 0 for e in all_errors]
+
+        from Lstm_model.evaluate import classification_report
+        metrics = classification_report(y_true, y_pred)
+
+        return {
+            'equipment_id': equipment_id,
+            'equipment_name': EQUIPMENT_LIST[equipment_id].get('name', equipment_id),
+            'n_normal': int(len(normal_errors)),
+            'n_anomaly': int(len(anom_errors)),
+            'threshold': round(threshold, 6),
+            'threshold_method': 'reconstruction error mean + 3σ',
+            'metrics': metrics,
+        }
+    except Exception as exc:
+        logger.exception('model evaluate failed')
+        return {'error': str(exc), 'equipment_id': equipment_id}
 
 
 def get_equipment_anomaly_status(equipment_id: str) -> Dict:

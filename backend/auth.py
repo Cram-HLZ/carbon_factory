@@ -34,7 +34,7 @@ from backend.security import (
     require_roles,
     verify_password,
 )
-from config.settings import ROLES
+from config.settings import DATA_SCOPES, ORGANIZATION_TREE, ROLES, WORKSHOPS
 from database.database import get_db
 from database.models import User
 
@@ -54,6 +54,8 @@ class UserCreate(BaseModel):
     password: str = Field(..., min_length=6, description='初始密码（至少 6 位）')
     role: str = Field(..., description='角色：management / operator / it_admin')
     permissions: Optional[list] = Field(None, description='自定义权限列表，缺省用角色默认权限')
+    scope_type: Optional[str] = Field('all', description='数据范围：all / factory / workshop')
+    scope_value: Optional[str] = Field(None, description='范围值：工厂code(F-01) 或 车间id(WS-01)')
 
 
 class RegisterRequest(BaseModel):
@@ -65,6 +67,22 @@ class UserUpdate(BaseModel):
     role: Optional[str] = Field(None, description='角色：management / operator / it_admin')
     permissions: Optional[list] = Field(None, description='权限列表')
     password: Optional[str] = Field(None, min_length=6, description='重置密码（可选）')
+    scope_type: Optional[str] = Field(None, description='数据范围：all / factory / workshop')
+    scope_value: Optional[str] = Field(None, description='范围值：工厂code 或 车间id')
+
+
+def _scope_label(scope_type: Optional[str], scope_value: Optional[str]) -> str:
+    """数据范围 → 人类可读描述，如「华南一厂（电芯基地）」/「电芯制备车间」/「全集团」"""
+    st = scope_type or 'all'
+    if st == 'all':
+        return '全集团'
+    if st == 'factory' and scope_value:
+        for f in ORGANIZATION_TREE['factories']:
+            if f['code'] == scope_value:
+                return f['name']
+    if st == 'workshop' and scope_value:
+        return WORKSHOPS.get(scope_value, {}).get('name', scope_value)
+    return f'{st}:{scope_value}' if scope_value else st
 
 
 def _user_out(u: User) -> dict:
@@ -76,6 +94,9 @@ def _user_out(u: User) -> dict:
         'role': u.role,
         'role_name': ROLES.get(u.role, {}).get('name', u.role),
         'permissions': permissions,
+        'scope_type': getattr(u, 'scope_type', 'all') or 'all',
+        'scope_value': getattr(u, 'scope_value', None),
+        'scope_label': _scope_label(getattr(u, 'scope_type', 'all'), getattr(u, 'scope_value', None)),
     }
 
 
@@ -91,6 +112,36 @@ def _ensure_role(role: str) -> None:
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             f'非法角色 {role!r}，可选 {list(ROLES.keys())}',
         )
+
+
+def _resolve_scope(scope_type: Optional[str], scope_value: Optional[str]) -> tuple:
+    """校验数据范围并归一化；组织级权限参数非法时抛 422。"""
+    st = (scope_type or 'all').strip()
+    if st not in DATA_SCOPES:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            f'非法数据范围 {st!r}，可选 {DATA_SCOPES}',
+        )
+    if st == 'all':
+        return 'all', None
+    if not scope_value:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            f'数据范围 {st} 必须提供 scope_value（工厂code 或 车间id）',
+        )
+    if st == 'factory':
+        valid = [f['code'] for f in ORGANIZATION_TREE['factories']]
+        if scope_value not in valid:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                f'非法工厂 {scope_value!r}，可选 {valid}',
+            )
+    if st == 'workshop' and scope_value not in WORKSHOPS:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            f'非法车间 {scope_value!r}，可选 {list(WORKSHOPS)}',
+        )
+    return st, scope_value
 
 
 # ============================================================
@@ -155,6 +206,36 @@ async def list_roles(_: User = Depends(get_current_user)):
     }
 
 
+@router.get('/scopes', summary='可选数据范围（组织级权限下拉）')
+async def list_scopes(_: User = Depends(get_current_user)):
+    return {
+        'scopes': DATA_SCOPES,
+        'factories': [
+            {'code': f['code'], 'name': f['name'], 'workshops': f['workshops']}
+            for f in ORGANIZATION_TREE['factories']
+        ],
+        'workshops': [{'id': k, 'name': v['name']} for k, v in WORKSHOPS.items()],
+    }
+
+
+@router.get('/org-tree', summary='组织层级（集团-工厂-车间）')
+async def org_tree(_: User = Depends(get_current_user)):
+    return {
+        'organization': {'code': ORGANIZATION_TREE['code'], 'name': ORGANIZATION_TREE['name']},
+        'factories': [
+            {
+                'code': f['code'],
+                'name': f['name'],
+                'workshops': [
+                    {'id': ws, 'name': WORKSHOPS.get(ws, {}).get('name', ws)}
+                    for ws in f['workshops']
+                ],
+            }
+            for f in ORGANIZATION_TREE['factories']
+        ],
+    }
+
+
 # ============================================================
 # 角色管理（仅 IT管理员）
 # ============================================================
@@ -174,6 +255,7 @@ async def create_user(
     _: User = Depends(require_roles('it_admin')),
 ):
     _ensure_role(req.role)
+    scope_type, scope_value = _resolve_scope(req.scope_type, req.scope_value)
     if db.query(User).filter(User.account == req.account).first():
         raise HTTPException(status.HTTP_409_CONFLICT, f'账号 {req.account} 已存在')
     user = User(
@@ -181,6 +263,8 @@ async def create_user(
         role=req.role,
         password_hash=hash_password(req.password),
         permissions=_resolve_permissions(req.role, req.permissions),
+        scope_type=scope_type,
+        scope_value=scope_value,
     )
     db.add(user)
     db.commit()
@@ -209,6 +293,13 @@ async def update_user(
         user.permissions = req.permissions
     if req.password is not None:
         user.password_hash = hash_password(req.password)
+    if req.scope_type is not None or req.scope_value is not None:
+        scope_type, scope_value = _resolve_scope(
+            req.scope_type if req.scope_type is not None else getattr(user, 'scope_type', 'all'),
+            req.scope_value if req.scope_value is not None else getattr(user, 'scope_value', None),
+        )
+        user.scope_type = scope_type
+        user.scope_value = scope_value
 
     db.commit()
     db.refresh(user)

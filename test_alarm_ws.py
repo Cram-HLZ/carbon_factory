@@ -9,7 +9,7 @@ test_alarm_ws —— 告警中心「实时弹窗」链路测试（WebSocket 推�
     前端 alarmRealtime.js 收到 type=='alarm' 即弹窗，因此本脚本收到该消息，
     即等价于「告警中心弹窗」链路打通。
 
-【依赖】 pip install websocket-client
+【零依赖】只使用 Python 标准库（socket 手写 WebSocket 客户端），无需安装额外包。
 
 【前置条件】
     1. 启动算法服务:  python main.py                        # 8000
@@ -30,14 +30,16 @@ test_alarm_ws —— 告警中心「实时弹窗」链路测试（WebSocket 推�
 from __future__ import annotations
 
 import argparse
+import base64
 import json
+import os
+import socket
+import struct
 import threading
 import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta
-
-import websocket  # websocket-client
 
 BASE = 'http://127.0.0.1:8001'
 WS_PATH = '/ws/alerts'
@@ -45,7 +47,150 @@ WS_PATH = '/ws/alerts'
 TARGET_EQ = 'I-9-01'  # 电芯烘烤炉（额定 45kW，scan_equipment 代表设备之一）
 
 received = []
-ws_opened = threading.Event()
+
+
+class SimpleWS:
+    """极简 WebSocket 客户端（仅标准库），用于订阅后端告警广播并接收文本帧。"""
+
+    def __init__(self, url: str, timeout: float = 10.0):
+        rest = url.split('://', 1)[1] if '://' in url else url
+        hostport, _, path = rest.partition('/')
+        path = '/' + path
+        if ':' in hostport:
+            self.host, port = hostport.rsplit(':', 1)
+            self.port = int(port)
+        else:
+            self.host, self.port = hostport, 80
+        self.path = path
+        self.timeout = timeout
+        self.sock = None
+        self._buf = b''
+
+    def connect(self) -> bool:
+        """TCP 连接 + WebSocket 握手，成功返回 True。"""
+        self.sock = socket.create_connection((self.host, self.port), timeout=self.timeout)
+        key = base64.b64encode(os.urandom(16)).decode()
+        req = (
+            f'GET {self.path} HTTP/1.1\r\n'
+            f'Host: {self.host}:{self.port}\r\n'
+            'Upgrade: websocket\r\n'
+            'Connection: Upgrade\r\n'
+            f'Sec-WebSocket-Key: {key}\r\n'
+            'Sec-WebSocket-Version: 13\r\n'
+            '\r\n'
+        )
+        self.sock.sendall(req.encode('ascii'))
+        self.sock.settimeout(self.timeout)
+        data = b''
+        while b'\r\n\r\n' not in data:
+            chunk = self.sock.recv(4096)
+            if not chunk:
+                raise IOError('握手失败：连接被关闭')
+            data += chunk
+        head, _, self._buf = data.partition(b'\r\n\r\n')
+        status = head.split(b'\r\n', 1)[0]
+        if b'101' not in status:
+            raise IOError(f'WebSocket 握手失败: {head.decode(errors="replace")}')
+        return True
+
+    def _require_sock(self) -> socket.socket:
+        """返回已建立的 socket；未连接时抛错（同时消除 Pylance 的 Optional 告警）。"""
+        if self.sock is None:
+            raise IOError('WebSocket 未连接，请先调用 connect()')
+        return self.sock
+
+    def recv_frame(self):
+        """接收一帧，返回 (opcode, payload)。0x1=text 0x8=close 0x9=ping 0xA=pong"""
+        sock = self._require_sock()
+        while len(self._buf) < 2:
+            chunk = sock.recv(4096)
+            if not chunk:
+                raise IOError('连接已关闭')
+            self._buf += chunk
+        b0, b1 = self._buf[0], self._buf[1]
+        opcode = b0 & 0x0F
+        masked = (b1 & 0x80) != 0
+        length = b1 & 0x7F
+        offset = 2
+        if length == 126:
+            while len(self._buf) < offset + 2:
+                self._buf += sock.recv(4096)
+            length = struct.unpack('>H', self._buf[offset:offset + 2])[0]
+            offset += 2
+        elif length == 127:
+            while len(self._buf) < offset + 8:
+                self._buf += sock.recv(4096)
+            length = struct.unpack('>Q', self._buf[offset:offset + 8])[0]
+            offset += 8
+        if masked:
+            while len(self._buf) < offset + 4:
+                self._buf += sock.recv(4096)
+            mask = self._buf[offset:offset + 4]
+            offset += 4
+        else:
+            mask = None
+        while len(self._buf) < offset + length:
+            chunk = sock.recv(4096)
+            if not chunk:
+                raise IOError('连接已关闭')
+            self._buf += chunk
+        payload = self._buf[offset:offset + length]
+        self._buf = self._buf[offset + length:]
+        if mask:
+            payload = bytes(b ^ mask[i % 4] for i, b in enumerate(payload))
+        return opcode, payload
+
+    def send_frame(self, opcode: int, payload: bytes = b'') -> None:
+        sock = self._require_sock()
+        mask = os.urandom(4)
+        n = len(payload)
+        header = bytearray([0x80 | opcode])  # FIN=1
+        if n < 126:
+            header.append(0x80 | n)
+        elif n < 65536:
+            header.append(0x80 | 126)
+            header += struct.pack('>H', n)
+        else:
+            header.append(0x80 | 127)
+            header += struct.pack('>Q', n)
+        header += mask
+        masked_payload = bytes(b ^ mask[i % 4] for i, b in enumerate(payload))
+        sock.sendall(bytes(header) + masked_payload)
+
+    def close(self) -> None:
+        try:
+            self.send_frame(0x8, struct.pack('>H', 1000))
+        except Exception:
+            pass
+        try:
+            if self.sock is not None:
+                self.sock.close()
+        except Exception:
+            pass
+
+
+def ws_listen(ws: SimpleWS) -> None:
+    """后台线程：循环收帧，text 帧记入 received；ping 回 pong。"""
+    while True:
+        try:
+            opcode, payload = ws.recv_frame()
+        except socket.timeout:
+            continue
+        except Exception as e:
+            print(f'  [WS CLOSE] {e}')
+            break
+        if opcode == 0x1:  # text
+            msg = payload.decode('utf-8', errors='replace')
+            received.append(msg)
+            print(f'  [WS 收到] {msg}')
+        elif opcode == 0x9:  # ping → pong
+            try:
+                ws.send_frame(0xA, payload)
+            except Exception:
+                break
+        elif opcode == 0x8:  # close
+            print('  [WS CLOSE]')
+            break
 
 
 def http(method: str, path: str, payload=None, token=None):
@@ -64,23 +209,6 @@ def http(method: str, path: str, payload=None, token=None):
             return e.code, {}
     except Exception as e:  # 连接失败
         return 0, {'error': str(e)}
-
-
-def on_open(ws):
-    ws_opened.set()
-
-
-def on_message(ws, msg):
-    received.append(msg)
-    print(f'  [WS 收到] {msg}')
-
-
-def on_error(ws, err):
-    print(f'  [WS ERROR] {err}')
-
-
-def on_close(ws, *a):
-    print('  [WS CLOSE]')
 
 
 def build_abnormal_readings(eq: str, minutes: int = 60):
@@ -124,16 +252,14 @@ def main() -> int:
     print('=' * 70)
 
     # 1. 建立 WebSocket 连接（模拟前端在线监听弹窗）
-    ws = websocket.WebSocketApp(
-        ws_url,
-        on_open=on_open, on_message=on_message, on_error=on_error, on_close=on_close,
-    )
-    t = threading.Thread(target=lambda: ws.run_forever(ping_interval=5), daemon=True)
-    t.start()
-    if not ws_opened.wait(timeout=5):
-        print('[1] [!] WebSocket 连接超时，请确认后端 8001 已启动')
-    else:
+    ws = SimpleWS(ws_url)
+    try:
+        ws.connect()
         print('[1] WebSocket 已连接 /ws/alerts（前端在线）')
+    except Exception as e:
+        print(f'[1] [!] WebSocket 连接失败：{e}，请确认后端 8001 已启动')
+        return 1
+    threading.Thread(target=ws_listen, args=(ws,), daemon=True).start()
 
     if args.no_scan:
         print('    （--no-scan 模式：保持连接接收广播，按 Ctrl+C 退出）')

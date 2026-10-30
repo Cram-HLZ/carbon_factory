@@ -103,6 +103,7 @@ class AnomalyDetector:
         reconstruction_error: float,
         equipment_id: str,
         timestamp: Optional[datetime] = None,
+        feature_contributions: Optional[List[Dict]] = None,
     ) -> Dict:
         """
         判断单条样本是否异常，返回结构化检测结果。
@@ -112,10 +113,11 @@ class AnomalyDetector:
         reconstruction_error : 重建误差（MSE）
         equipment_id : 设备 ID（用于查基线 + 告警冷却）
         timestamp : 异常发生时间，默认当前时间
+        feature_contributions : 可解释性：逐特征重建误差贡献（降序 top-N），可选
 
         Returns
         -------
-        dict，含 is_anomaly / severity / threshold / anomaly_score 等
+        dict，含 is_anomaly / severity / threshold / anomaly_score / feature_contributions 等
         """
         ts = timestamp or datetime.now()
         threshold, threshold_type = self.get_threshold(equipment_id)
@@ -145,6 +147,8 @@ class AnomalyDetector:
             'severity': severity,
             'should_alert': should_alert,
         }
+        if feature_contributions is not None:
+            result['feature_contributions'] = feature_contributions
         return result
 
     # ---------------- 告警冷却 ----------------

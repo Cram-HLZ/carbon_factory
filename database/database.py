@@ -49,3 +49,33 @@ def init_database() -> None:
     from database.models import Base  # 本地导入，确保模型已注册到 Base.metadata
 
     Base.metadata.create_all(bind=engine)
+    _migrate_sqlite(engine)
+
+
+def _migrate_sqlite(engine) -> None:
+    """SQLite 轻量迁移：create_all 不会修改已存在的表结构，这里补齐后加列。"""
+    if not DATABASE_URL.startswith('sqlite'):
+        return
+    from sqlalchemy import inspect, text
+
+    insp = inspect(engine)
+    tables = set(insp.get_table_names())
+
+    # 表 -> {待补列名: SQLite 列定义}
+    migrations = {
+        'alarm_record': {
+            'feature_contributions': 'JSON',
+        },
+        'user': {
+            'scope_type': "VARCHAR(16) NOT NULL DEFAULT 'all'",
+            'scope_value': 'VARCHAR(32)',
+        },
+    }
+    for table, columns in migrations.items():
+        if table not in tables:
+            continue
+        existing = {c['name'] for c in insp.get_columns(table)}
+        with engine.begin() as conn:
+            for col, decl in columns.items():
+                if col not in existing:
+                    conn.execute(text(f'ALTER TABLE {table} ADD COLUMN {col} {decl}'))

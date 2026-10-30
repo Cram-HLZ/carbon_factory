@@ -52,7 +52,7 @@
         <thead>
           <tr>
             <th v-if="canDelete" style="width:36px"><input type="checkbox" class="form-check-input" :checked="allChecked" @change="toggleAll" /></th>
-            <th>ID</th><th>告警时间</th><th>设备</th><th>严重度</th><th>根因</th><th>处理状态</th><th style="width:250px">操作</th>
+            <th>ID</th><th>告警时间</th><th>设备</th><th>严重度</th><th>根因</th><th>异常特征贡献</th><th>处理状态</th><th style="width:250px">操作</th>
           </tr>
         </thead>
         <tbody>
@@ -63,6 +63,14 @@
             <td>{{ a.equipment_name || a.equipment_id }}<div class="small text-secondary">{{ a.equipment_id }}</div></td>
             <td><span class="badge" :class="'bg-' + (SEVERITY_COLOR[a.severity] || 'secondary')">{{ SEVERITY_LABEL[a.severity] || a.severity }}</span></td>
             <td class="small">{{ a.root_cause || '—' }}</td>
+            <td>
+              <div v-if="a.feature_contributions && a.feature_contributions.length" class="d-flex flex-column gap-1">
+                <span v-for="f in a.feature_contributions.slice(0, 3)" :key="f.feature" class="badge text-bg-light border small text-start">
+                  {{ f.feature_name || f.feature }} · {{ pct(f.contribution) }}
+                </span>
+              </div>
+              <span v-else class="small text-secondary">—</span>
+            </td>
             <td><span class="badge" :class="STATUS_BADGE[a.status] || 'bg-secondary'">{{ STATUS_LABEL[a.status] || a.status }}</span></td>
             <td>
               <div class="d-flex gap-1 flex-wrap">
@@ -152,6 +160,8 @@ const selectedCount = computed(() => selectedIds.value.length)
 const allChecked = computed(() => items.value.length > 0 && items.value.every(a => a.checked))
 
 function countBy(s) { return items.value.filter(a => a.status === s).length }
+
+function pct(c) { return c == null ? '' : Math.round(c * 100) + '%' }
 
 function showErr(m) { alertMsg.value = m; alertType.value = 'danger' }
 function showInfo(m) { alertMsg.value = m; alertType.value = 'info' }

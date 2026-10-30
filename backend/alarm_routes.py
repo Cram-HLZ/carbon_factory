@@ -21,7 +21,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status as http_sta
 from pydantic import BaseModel, Field
 
 from backend import alarm_service, detection_loop
-from backend.security import get_current_user, require_roles
+from backend.security import get_current_user, require_roles, visible_workshops
 from database.models import User
 
 router = APIRouter(prefix='/api/alarms', tags=['告警管理'])
@@ -53,9 +53,13 @@ async def list_alarms(
     equipment_id: Optional[str] = Query(None, description='设备ID过滤'),
     limit: int = Query(100, ge=1, le=500, description='每页条数'),
     offset: int = Query(0, ge=0, description='偏移量'),
-    _: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
-    return alarm_service.list_alarms(status, severity, equipment_id, limit, offset)
+    # 组织级数据隔离：按用户数据范围过滤可见车间的告警
+    return alarm_service.list_alarms(
+        status, severity, equipment_id, limit, offset,
+        workshop_ids=visible_workshops(user),
+    )
 
 
 @router.get('/{alarm_id}', summary='单条告警详情')

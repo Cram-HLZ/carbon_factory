@@ -42,6 +42,18 @@ FEATURE_COLUMNS: List[str] = [
     'runtime_hours',
 ]
 
+# 特征中文展示名（可解释性：top 特征贡献的前端展示用）
+FEATURE_DISPLAY_NAMES: dict = {
+    'load_rate': '负载率',
+    'power': '有功功率',
+    'energy_diff': '能耗增量',
+    'temperature': '设备温度',
+    'vibration': '振动值',
+    'carbon_emission': '碳排放',
+    'power_change_rate': '功率变化率',
+    'runtime_hours': '累计运行时长',
+}
+
 # 验证：必须与 config.MODEL_CONFIG['input_size'] 一致
 assert len(FEATURE_COLUMNS) == MODEL_CONFIG['input_size'], (
     'FEATURE_COLUMNS 长度必须等于 MODEL_CONFIG.input_size，'

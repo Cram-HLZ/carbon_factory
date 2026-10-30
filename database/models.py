@@ -115,6 +115,9 @@ class AlarmRecord(Base):
     severity: Mapped[str] = mapped_column(String(16), nullable=False, default='medium', comment='严重度 critical/high/medium/low')
     root_cause: Mapped[str] = mapped_column(String(255), nullable=True, comment='根因描述')
     status: Mapped[str] = mapped_column(String(16), nullable=False, default='pending', comment='处理状态 pending/processing/resolved')
+    feature_contributions: Mapped[List] = mapped_column(
+        JSON, nullable=True, comment='可解释性：top 特征贡献（feature/feature_name/contribution）'
+    )
 
 
 class Strategy(Base):
@@ -132,7 +135,7 @@ class Strategy(Base):
 
 
 class User(Base):
-    """用户表：账号 / 角色 / 密码哈希 / 权限"""
+    """用户表：账号 / 角色 / 密码哈希 / 权限 / 数据范围（组织级隔离）"""
 
     __tablename__ = 'user'
 
@@ -141,3 +144,25 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(32), nullable=False, default='operator', comment='角色 management/operator/it_admin')
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False, comment='密码哈希')
     permissions: Mapped[List] = mapped_column(JSON, nullable=True, comment='权限列表（JSON）')
+    scope_type: Mapped[str] = mapped_column(String(16), nullable=False, default='all', comment='数据范围 all/factory/workshop')
+    scope_value: Mapped[str] = mapped_column(String(32), nullable=True, comment='范围值：工厂code(F-01) 或 车间id(WS-01)')
+
+
+class MrvReport(Base):
+    """MRV 核查报告台账：记录每期报告的核算结果与核查留痕（监测-报告-核查闭环）"""
+
+    __tablename__ = 'mrv_report'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    period: Mapped[str] = mapped_column(String(16), nullable=False, index=True, comment='报告期，如 2026-09')
+    scope1_emission: Mapped[float] = mapped_column(Float, nullable=True, comment='范围1直接排放(kgCO2)')
+    scope2_emission: Mapped[float] = mapped_column(Float, nullable=True, comment='范围2外购电力间接(kgCO2)')
+    scope3_emission: Mapped[float] = mapped_column(Float, nullable=True, comment='范围3其他间接(kgCO2)')
+    data_quality_score: Mapped[float] = mapped_column(Float, nullable=True, comment='数据质量评分 0-100')
+    methodology: Mapped[str] = mapped_column(String(128), nullable=True, comment='核算方法学')
+    uncertainty: Mapped[str] = mapped_column(String(255), nullable=True, comment='不确定性说明')
+    verifier: Mapped[str] = mapped_column(String(64), nullable=True, comment='核查人账号')
+    verification_status: Mapped[str] = mapped_column(String(16), nullable=False, default='draft', comment='核查状态 draft/self_audited/verified')
+    verified_at: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment='核查时间')
+    generated_by: Mapped[str] = mapped_column(String(64), nullable=True, comment='生成人账号')
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now, comment='生成时间')

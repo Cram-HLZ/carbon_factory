@@ -25,13 +25,13 @@ import hmac
 import json
 import secrets
 import time
-from typing import Optional
+from typing import List, Optional, Set
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from config.settings import AUTH_CONFIG
+from config.settings import AUTH_CONFIG, EQUIPMENT_LIST, ORGANIZATION_TREE, ROLES
 from database.database import get_db
 from database.models import User
 
@@ -164,5 +164,56 @@ def require_roles(*allowed_roles: str):
         if user.role not in allowed_roles:
             raise HTTPException(status.HTTP_403_FORBIDDEN, '权限不足：当前角色无权访问')
         return user
+
+    return guard
+
+
+# ============================================================
+# 组织级数据隔离 & 字段级权限
+# ============================================================
+def _factory_workshops(factory_code: str) -> List[str]:
+    """返回某工厂下辖的全部车间 ID（无匹配返回空列表）"""
+    for factory in ORGANIZATION_TREE['factories']:
+        if factory['code'] == factory_code:
+            return list(factory['workshops'])
+    return []
+
+
+def visible_workshops(user: User) -> Optional[Set[str]]:
+    """
+    按用户数据范围（scope_type/scope_value）返回可见车间集合。
+
+    返回 None 表示全集团可见（无隔离）；返回 set 表示仅这些车间可见。
+    scope_type 语义：all=全集团 / factory=单工厂 / workshop=单车间。
+    """
+    scope_type = getattr(user, 'scope_type', 'all') or 'all'
+    scope_value = getattr(user, 'scope_value', None)
+    if scope_type == 'all':
+        return None
+    if scope_type == 'factory' and scope_value:
+        workshops = _factory_workshops(scope_value)
+        return set(workshops) if workshops else set()
+    if scope_type == 'workshop' and scope_value:
+        return {scope_value}
+    return set()
+
+
+def equipment_workshop(equipment_id: str) -> Optional[str]:
+    """设备 ID → 所属车间 ID（无该设备返回 None）"""
+    info = EQUIPMENT_LIST.get(equipment_id)
+    return info.get('workshop_id') if info else None
+
+
+def require_permission(*perms: str):
+    """
+    字段级/功能级权限守卫：要求用户具备指定权限之一；'*' 通配放行。
+    权限来源 = 用户自定义 permissions ∪ 角色默认 permissions（见 ROLES）。
+    """
+
+    def guard(user: User = Depends(get_current_user)) -> User:
+        granted = set(user.permissions or []) | set(ROLES.get(user.role, {}).get('permissions', []))
+        if '*' in granted or granted.intersection(perms):
+            return user
+        raise HTTPException(status.HTTP_403_FORBIDDEN, '权限不足：缺少所需权限')
 
     return guard

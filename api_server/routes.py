@@ -12,6 +12,7 @@ Swagger UI 在线测试：http://localhost:8000/docs//终端输入uvicorn main:a
     异常检测：
         POST /api/v1/anomaly/detect         异常检测（输入 60×8 矩阵）
         GET  /api/v1/anomaly/equipment/{id} 设备当前异常状态
+        GET  /api/v1/anomaly/evaluate       模型评估指标（accuracy/recall/f1 + 混淆矩阵）
     溯源：
         POST /api/v1/traceability/report    设备碳排溯源报告
     降碳方案：
@@ -95,6 +96,20 @@ async def detect_anomaly(request: AnomalyDetectRequest):
 async def get_equipment_anomaly_status(equipment_id: str):
     """获取设备当前异常状态（从最近一条数据自动检测）"""
     result = services.get_equipment_anomaly_status(equipment_id)
+    if isinstance(result, dict) and 'error' in result:
+        return APIResponse(code=500, message=result['error'], data=result)
+    return APIResponse(data=result)
+
+
+@router.get('/anomaly/evaluate', response_model=APIResponse, summary='AI 模型评估指标')
+async def evaluate_anomaly_model(
+    equipment_id: str = Query('I-9-01', description='设备 ID（需已训练模型）'),
+):
+    """
+    模型评估指标（可解释性量化）：注入合成异常构造 ground truth，
+    返回 accuracy / precision / recall / F1 / 混淆矩阵。
+    """
+    result = services.evaluate_model(equipment_id)
     if isinstance(result, dict) and 'error' in result:
         return APIResponse(code=500, message=result['error'], data=result)
     return APIResponse(data=result)

@@ -1,6 +1,6 @@
 <template>
   <div>
-    <h5 class="mb-3 report-head">报表中心 <small class="text-secondary fs-6">（月度碳排报告 · 设备溯源台账 · 降碳成效对比 · 导出 PDF/Excel）</small></h5>
+    <h5 class="mb-3 report-head">报表中心 <small class="text-secondary fs-6">（月度碳排报告 · 设备溯源台账 · 降碳成效对比 · MRV 核查报告 · 导出 PDF/Excel）</small></h5>
 
     <!-- ① 月度碳排报告 -->
     <div class="card mb-4" style="padding:18px 20px">
@@ -65,13 +65,39 @@
       </div>
       <div class="preview" v-html="states.savings.html"></div>
     </div>
+
+    <!-- ④ MRV 碳排放核查报告 -->
+    <div class="card mb-4" style="padding:18px 20px">
+      <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+        <h6 class="mb-0 fw-semibold">MRV 碳排放核查报告 <small class="text-secondary">（范围 1/2/3 · 数据质量 · 核查声明）</small></h6>
+        <div class="d-flex align-items-end gap-2 flex-wrap">
+          <div><label class="form-label small mb-1">年份</label><input v-model.number="mrv.year" class="form-control form-control-sm" type="number" style="width:96px" /></div>
+          <div>
+            <label class="form-label small mb-1">月份</label>
+            <select v-model="mrv.month" class="form-select form-select-sm" style="width:80px">
+              <option v-for="i in 12" :key="i" :value="i">{{ i }} 月</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label small mb-1">格式</label>
+            <select v-model="mrv.format" class="form-select form-select-sm" style="width:90px">
+              <option value="excel">Excel</option><option value="pdf">PDF</option>
+            </select>
+          </div>
+          <button class="btn btn-sm btn-outline-success" @click="preview('mrv')">预览</button>
+          <button class="btn btn-sm btn-success" @click="download('mrv')">下载</button>
+          <button class="btn btn-sm btn-outline-secondary" @click="downloadWorkbook">底稿</button>
+        </div>
+      </div>
+      <div class="preview" v-html="states.mrv.html"></div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { reactive } from 'vue'
 import {
-  reportMonthly, reportTraceability, reportSavings,
+  reportMonthly, reportTraceability, reportSavings, reportMrv,
   downloadReport, saveBlob,
 } from '../api'
 
@@ -79,11 +105,13 @@ const states = reactive({
   monthly: reactive({ loading: false, error: '', html: '' }),
   trace: reactive({ loading: false, error: '', html: '' }),
   savings: reactive({ loading: false, error: '', html: '' }),
+  mrv: reactive({ loading: false, error: '', html: '' }),
 })
 
 const monthly = reactive({ year: new Date().getFullYear(), month: new Date().getMonth() + 1, format: 'excel' })
 const trace = reactive({ equipmentId: '', start: '', end: '', format: 'excel' })
 const savings = reactive({ format: 'excel' })
+const mrv = reactive({ year: new Date().getFullYear(), month: new Date().getMonth() + 1, format: 'pdf' })
 
 function esc(v) {
   return String(v == null ? '—' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -135,6 +163,14 @@ function config(key) {
       fallback: 'equipment_traceability',
     }
   }
+  if (key === 'mrv') {
+    return {
+      path: '/report/mrv',
+      jsonParams: { year: mrv.year, month: mrv.month },
+      dlParams: { year: mrv.year, month: mrv.month, format: mrv.format },
+      fallback: `mrv_report_${mrv.year}_${mrv.month}`,
+    }
+  }
   return {
     path: '/report/savings',
     jsonParams: {},
@@ -147,6 +183,7 @@ const loaders = {
   monthly: (p) => reportMonthly(p.year, p.month),
   trace: (p) => reportTraceability(p),
   savings: () => reportSavings(),
+  mrv: (p) => reportMrv(p.year, p.month),
 }
 
 async function preview(key) {
@@ -173,6 +210,19 @@ async function download(key) {
     saveBlob(blob, name)
   } catch (e) {
     st.html = '<div class="text-danger small">⚠ ' + esc(errText(e) || '下载失败') + '</div>'
+  }
+}
+
+async function downloadWorkbook() {
+  try {
+    const { blob, name } = await downloadReport(
+      '/report/mrv/workbook',
+      { year: mrv.year, month: mrv.month, format: 'excel' },
+      `mrv_workbook_${mrv.year}_${mrv.month}`,
+    )
+    saveBlob(blob, name)
+  } catch (e) {
+    states.mrv.html = '<div class="text-danger small">⚠ ' + esc(errText(e) || '底稿下载失败') + '</div>'
   }
 }
 

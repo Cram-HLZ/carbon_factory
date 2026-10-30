@@ -15,11 +15,11 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 from config.settings import EQUIPMENT_LIST, SEVERITY_LABELS
 from database.database import SessionLocal
-from database.models import AlarmRecord
+from database.models import AlarmRecord, Equipment
 from backend import notifier
 
 logger = logging.getLogger(__name__)
@@ -50,6 +50,7 @@ def _to_dict(rec: AlarmRecord) -> Dict[str, Any]:
         'severity_label': SEVERITY_LABELS.get(rec.severity, rec.severity),
         'root_cause': rec.root_cause,
         'status': rec.status,
+        'feature_contributions': rec.feature_contributions,
     }
 
 
@@ -64,6 +65,7 @@ def record_alarm(detection: Dict[str, Any]) -> Dict[str, Any]:
         severity=detection.get('severity', 'medium'),
         root_cause=_describe_root_cause(detection),
         status='pending',
+        feature_contributions=detection.get('feature_contributions'),
     )
     with SessionLocal() as db:
         db.add(rec)
@@ -87,8 +89,10 @@ def list_alarms(
     equipment_id: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
+    workshop_ids: Optional[Set[str]] = None,
 ) -> Dict[str, Any]:
-    """告警历史查询：支持按状态 / 严重度 / 设备过滤 + 分页"""
+    """告警历史查询：支持按状态 / 严重度 / 设备 / 车间范围过滤 + 分页
+    （workshop_ids=None 表示不限范围，非 None 则按组织级数据隔离过滤）"""
     with SessionLocal() as db:
         q = db.query(AlarmRecord)
         if status:
@@ -97,6 +101,10 @@ def list_alarms(
             q = q.filter(AlarmRecord.severity == severity)
         if equipment_id:
             q = q.filter(AlarmRecord.equipment_id == equipment_id)
+        if workshop_ids is not None:
+            q = q.join(Equipment, Equipment.equipment_id == AlarmRecord.equipment_id).filter(
+                Equipment.workshop_id.in_(workshop_ids)
+            )
         total = q.count()
         rows = q.order_by(AlarmRecord.alarm_time.desc()).offset(offset).limit(limit).all()
         return {
@@ -205,6 +213,7 @@ def _build_payload(rec: Dict[str, Any], detection: Dict[str, Any]) -> Dict[str, 
         'threshold': detection.get('threshold'),
         'reconstruction_error': detection.get('reconstruction_error'),
         'root_cause': rec['root_cause'],
+        'feature_contributions': rec.get('feature_contributions'),
         'alarm_time': rec['alarm_time'],
         'status': rec['status'],
     }
