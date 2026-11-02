@@ -9,3 +9,8 @@ pymysql==1.2.0
 # === 报表导出（Excel / PDF）===
 openpyxl==3.1.5
 reportlab==5.0.1
+
+# === AI Agent（DeepSeek 大模型，OpenAI 兼容接口）===
+openai==1.54.0
+# openai 1.54 与 httpx>=0.28 不兼容（proxies 参数被移除），需锁定 0.26~0.27
+httpx>=0.26,<0.28

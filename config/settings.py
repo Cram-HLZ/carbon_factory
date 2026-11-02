@@ -614,6 +614,18 @@ ARCHIVE_CONFIG = {
 
 
 # ============================================================
+# 11c. AI Agent（DeepSeek 大模型）
+# ============================================================
+# 由 .env 注入：DEEPSEEK_API_KEY / DEEPSEEK_BASE_URL / DEEPSEEK_MODEL
+# deepseek-chat 支持 function calling，deepseek-reasoner 用于深度推理
+DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')
+DEEPSEEK_BASE_URL = os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.com')
+DEEPSEEK_MODEL = os.environ.get('DEEPSEEK_MODEL', 'deepseek-chat')
+DEEPSEEK_TIMEOUT = float(os.environ.get('DEEPSEEK_TIMEOUT', 60))
+DEEPSEEK_MAX_TOOL_ROUNDS = int(os.environ.get('DEEPSEEK_MAX_TOOL_ROUNDS', 5))
+
+
+# ============================================================
 # 12. 统一导出（settings 字典，便于整体传入或一次性查看）
 # ============================================================
 settings = {

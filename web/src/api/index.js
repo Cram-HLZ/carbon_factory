@@ -1,5 +1,6 @@
 // api/index.js —— 后端接口封装（统一返回 resp.data，业务视图自行处理 code/data 封装）
 import http from './http'
+import { API_BASE } from '../constants'
 
 // ==================== 认证 ====================
 export const login = (account, password) => http.post('/auth/login', { account, password }).then(r => r.data)
@@ -33,6 +34,55 @@ export const scanAlarms = () => http.post('/alarms/scan').then(r => r.data)
 // ==================== 分项计量 ====================
 export const getSubmeterSummary = (params) =>
   http.get('/ingest/submeter/summary', { params }).then(r => r.data)
+
+// ==================== AI 助手 ====================
+export const chat = (messages) =>
+  http.post('/agent/chat', { messages }, { timeout: 120000 }).then(r => r.data)
+
+// SSE 流式对话（打字机效果）
+// onEvent(evt)：evt.type = 'delta'（文本块）| 'status'（工具进度）| 'done'
+export async function chatStream(messages, onEvent) {
+  const resp = await fetch(`${API_BASE}/agent/chat/stream`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${localStorage.getItem('cf_token') || ''}`,
+    },
+    body: JSON.stringify({ messages }),
+  })
+  if (resp.status === 401) {
+    localStorage.removeItem('cf_token')
+    localStorage.removeItem('cf_user')
+    window.location.hash = '#/login'
+    throw new Error('登录已过期，请重新登录')
+  }
+  if (!resp.ok) {
+    let detail = `${resp.status} ${resp.statusText}`
+    try {
+      const j = await resp.json()
+      detail = j.detail || j.message || detail
+    } catch (e) { /* 非 JSON 响应 */ }
+    throw new Error(detail)
+  }
+  const reader = resp.body.getReader()
+  const decoder = new TextDecoder()
+  let buf = ''
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buf += decoder.decode(value, { stream: true })
+    let i
+    while ((i = buf.indexOf('\n\n')) >= 0) {
+      const raw = buf.slice(0, i)
+      buf = buf.slice(i + 2)
+      const dataLine = raw.split('\n').find((l) => l.startsWith('data:'))
+      if (!dataLine) continue
+      const payload = dataLine.slice(5).trim()
+      if (!payload || payload === '[DONE]') continue
+      try { onEvent(JSON.parse(payload)) } catch (e) { /* 忽略坏块 */ }
+    }
+  }
+}
 
 // ==================== 报表 ====================
 export const reportMonthly = (year, month) =>

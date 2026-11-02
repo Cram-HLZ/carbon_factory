@@ -26,6 +26,7 @@ from backend.websocket import router as websocket_router
 from backend.alarm_routes import router as alarm_router
 from backend.report_routes import router as report_router
 from backend.history_routes import router as history_router
+from backend.ai_agent_routes import router as ai_agent_router
 from backend import archive_loop, detection_loop
 
 app = FastAPI(
@@ -58,6 +59,8 @@ app.include_router(alarm_router)
 app.include_router(report_router)
 # 挂载历史时序路由（单设备时序查询 / 手动归档）
 app.include_router(history_router)
+# 挂载 AI 助手路由（DeepSeek 大模型 + 工具调用）
+app.include_router(ai_agent_router)
 # 挂载 WebSocket 实时推送端点（/ws/alerts）
 app.include_router(websocket_router)
 

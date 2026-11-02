@@ -42,6 +42,9 @@
         <div v-for="(line, i) in t.lines" :key="i" class="small" :class="{ 'text-muted': i !== 1 }">{{ line }}</div>
       </div>
     </div>
+
+    <!-- 全局 AI 助手浮窗 -->
+    <AiAssistant />
   </div>
 </template>
 
@@ -53,6 +56,7 @@ import { ROLE_NAMES } from '../constants'
 import { connection } from '../composables/connection'
 import { toasts, dismissToast } from '../composables/toast'
 import { useAlarmRealtime } from '../composables/alarmRealtime'
+import AiAssistant from '../components/AiAssistant.vue'
 
 const route = useRoute()
 const router = useRouter()
