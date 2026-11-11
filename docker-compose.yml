@@ -25,6 +25,10 @@ services:
       PUSH_TYPE: ${PUSH_TYPE:-pushplus}
       PUSHPLUS_TOKEN: ${PUSHPLUS_TOKEN}
       SERVERCHAN_KEY: ${SERVERCHAN_KEY}
+      # AI 助手（DeepSeek）
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
     volumes:
       # SQLite 数据库文件持久化（database/carbon_factory.db）
       - database_data:/app/database
