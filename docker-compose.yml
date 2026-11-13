@@ -43,7 +43,8 @@ services:
       context: .
       dockerfile: deploy/Dockerfile.web
     ports:
-      - "80:80"
+      # 对外用 8080，避开境内服务器未备案时 80 端口的拦截
+      - "8080:80"
       # 配置 HTTPS 后开启 443（证书在 nginx.conf 中挂载）
       # - "443:443"
     depends_on: [backend]
