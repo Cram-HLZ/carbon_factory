@@ -580,6 +580,14 @@ AUTH_CONFIG = {
     'pbkdf2_iterations': 100_000,
 }
 
+# 注册策略（生产可用环境变量调整，无需改代码/重建镜像）
+#   REGISTER_ENABLED=false           关闭自主注册，账号只能由 IT管理员创建
+#   REGISTER_REQUIRES_APPROVAL=true  开放注册但新账号需 IT管理员审批后才能登录
+REGISTER_ENABLED = os.environ.get('REGISTER_ENABLED', 'true').lower() in ('1', 'true', 'yes', 'on')
+REGISTER_REQUIRES_APPROVAL = os.environ.get('REGISTER_REQUIRES_APPROVAL', 'true').lower() in (
+    '1', 'true', 'yes', 'on'
+)
+
 # 生产安全护栏：生产环境若使用默认/空密钥，直接拒绝启动，防止 JWT 令牌被伪造
 if os.environ.get('APP_ENV', '').lower() == 'production':
     if not AUTH_CONFIG['secret_key'] or AUTH_CONFIG['secret_key'] == _DEFAULT_SECRET:

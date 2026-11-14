@@ -154,6 +154,9 @@ def get_current_user(
     user = db.query(User).filter(User.account == payload.get('sub')).first()
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, '用户不存在或已被删除')
+    # 待审批 / 已停用账号即使持有旧令牌也拒绝访问
+    if (getattr(user, 'status', 'active') or 'active') != 'active':
+        raise HTTPException(status.HTTP_403_FORBIDDEN, '账号待审批或已停用，请联系 IT管理员')
     return user
 
 

@@ -1,0 +1,13 @@
+# Caddy 反向代理：自动申请/续期 Let's Encrypt 证书
+# 安装：/etc/caddy/Caddyfile 使用本文件内容，替换 your-domain.com 为你的域名
+# 说明：Caddy 默认不缓冲响应且自动处理 WebSocket Upgrade，
+#       SSE（/api/agent/chat/stream）与 wss（/ws/alerts）无需额外配置
+
+{
+	email your@email.com
+}
+
+your-domain.com {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8080
+}

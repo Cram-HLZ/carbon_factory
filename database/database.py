@@ -69,6 +69,7 @@ def _migrate_sqlite(engine) -> None:
         'user': {
             'scope_type': "VARCHAR(16) NOT NULL DEFAULT 'all'",
             'scope_value': 'VARCHAR(32)',
+            'status': "VARCHAR(16) NOT NULL DEFAULT 'active'",
         },
     }
     for table, columns in migrations.items():

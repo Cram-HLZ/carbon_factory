@@ -5,14 +5,17 @@ import { API_BASE } from '../constants'
 // ==================== 认证 ====================
 export const login = (account, password) => http.post('/auth/login', { account, password }).then(r => r.data)
 export const register = (account, password) => http.post('/auth/register', { account, password }).then(r => r.data)
+export const getRegisterConfig = () => http.get('/auth/register-config').then(r => r.data)
 export const getMe = () => http.get('/auth/me').then(r => r.data)
 export const logout = () => http.post('/auth/logout').then(r => r.data)
 export const getRoles = () => http.get('/auth/roles').then(r => r.data)
 
-export const listUsers = () => http.get('/auth/users').then(r => r.data)
+export const listUsers = (status) => http.get('/auth/users', { params: status ? { status } : {} }).then(r => r.data)
 export const createUser = (payload) => http.post('/auth/users', payload).then(r => r.data)
 export const updateUser = (id, payload) => http.put(`/auth/users/${id}`, payload).then(r => r.data)
 export const deleteUser = (id) => http.delete(`/auth/users/${id}`).then(r => r.data)
+export const approveUser = (id) => http.post(`/auth/users/${id}/approve`).then(r => r.data)
+export const rejectUser = (id) => http.post(`/auth/users/${id}/reject`).then(r => r.data)
 
 // ==================== 算法转发（{code, message, data} 封装） ====================
 export const getOverview = () => http.get('/carbon/overview').then(r => r.data)

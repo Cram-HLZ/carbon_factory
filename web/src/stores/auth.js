@@ -61,7 +61,9 @@ export const useAuthStore = defineStore('auth', {
     },
     async register(account, password) {
       const data = await apiRegister(account, password)
-      this.setSession(data.access_token, data.user)
+      // 审批制下后端不签发令牌，只返回 pending 提示
+      if (data && data.access_token) this.setSession(data.access_token, data.user)
+      return data
     },
     async logout() {
       try { await apiLogout() } catch (e) { /* 无状态令牌，忽略 */ }

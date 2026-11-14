@@ -6,6 +6,9 @@ WORKDIR /app
 COPY requirements-base.txt requirements-algo.txt ./
 # 先装 CPU 版 torch，避免默认从 PyPI 拉取携带 CUDA 的巨量体积（Windows/Linux 通用）
 RUN pip install --no-cache-dir torch==2.13.0 --index-url https://download.pytorch.org/whl/cpu
+# 国内构建加速：其余依赖走阿里云 PyPI 镜像（torch 层保持在上面，可复用缓存）
+ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/ \
+    PIP_TRUSTED_HOST=mirrors.aliyun.com
 # torch 已在上面以 +cpu 版装好，此处 requirements-algo.txt 中的 torch==2.13.0 会被判定为已满足（PEP 440 忽略 local 标签），不会重复拉取
 RUN pip install --no-cache-dir -r requirements-base.txt -r requirements-algo.txt
 

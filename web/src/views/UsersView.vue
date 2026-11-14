@@ -24,16 +24,29 @@
 
     <!-- 用户列表 -->
     <div class="card" style="padding:16px 20px">
+      <div class="d-flex gap-2 mb-3">
+        <button class="btn btn-sm" :class="filter === 'all' ? 'btn-dark' : 'btn-outline-secondary'" @click="filter = 'all'">全部</button>
+        <button class="btn btn-sm" :class="filter === 'pending' ? 'btn-warning' : 'btn-outline-secondary'" @click="filter = 'pending'">
+          待审批 <span v-if="pendingCount" class="badge bg-danger">{{ pendingCount }}</span>
+        </button>
+        <button class="btn btn-sm" :class="filter === 'active' ? 'btn-success' : 'btn-outline-secondary'" @click="filter = 'active'">正常</button>
+      </div>
       <table class="table align-middle mb-0">
-        <thead><tr><th>ID</th><th>账号</th><th>角色</th><th>权限</th><th style="width:280px">操作</th></tr></thead>
+        <thead><tr><th>ID</th><th>账号</th><th>状态</th><th>角色</th><th>权限</th><th style="width:280px">操作</th></tr></thead>
         <tbody>
-          <tr v-for="u in users" :key="u.id">
+          <tr v-for="u in filteredUsers" :key="u.id">
             <td>{{ u.id }}</td>
             <td>{{ u.account }}</td>
+            <td><span class="badge" :class="statusClass(u.status)">{{ u.status_name || u.status }}</span></td>
             <td>{{ roleLabel(u.role) }}</td>
             <td class="small text-secondary">{{ (u.permissions || []).join(', ') || '—' }}</td>
             <td>
-              <div class="d-flex gap-2 align-items-center">
+              <!-- 待审批账号：通过 / 驳回 -->
+              <div v-if="u.status === 'pending'" class="d-flex gap-2">
+                <button class="btn btn-sm btn-success" @click="approve(u)">通过</button>
+                <button class="btn btn-sm btn-outline-danger" @click="reject(u)">驳回</button>
+              </div>
+              <div v-else class="d-flex gap-2 align-items-center">
                 <select v-model="u.pendingRole" class="form-select form-select-sm">
                   <option v-for="r in roleOptions" :key="r.value" :value="r.value">{{ r.label }}</option>
                 </select>
@@ -44,20 +57,41 @@
           </tr>
         </tbody>
       </table>
-      <div v-if="!users.length" class="text-center text-secondary small py-3">暂无用户</div>
+      <div v-if="!filteredUsers.length" class="text-center text-secondary small py-3">暂无用户</div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { getRoles, listUsers, createUser as apiCreateUser, updateUser as apiUpdateUser, deleteUser as apiDeleteUser } from '../api'
+import { ref, reactive, computed, onMounted } from 'vue'
+import {
+  getRoles,
+  listUsers,
+  createUser as apiCreateUser,
+  updateUser as apiUpdateUser,
+  deleteUser as apiDeleteUser,
+  approveUser as apiApproveUser,
+  rejectUser as apiRejectUser,
+} from '../api'
 import { ROLE_NAMES } from '../constants'
 
 const err = ref('')
 const users = ref([])
 const roleOptions = ref([])
+const filter = ref('all')
 const form = reactive({ account: '', password: '', role: '' })
+
+const pendingCount = computed(() => users.value.filter(u => u.status === 'pending').length)
+const filteredUsers = computed(() => {
+  if (filter.value === 'all') return users.value
+  return users.value.filter(u => (u.status || 'active') === filter.value)
+})
+
+function statusClass(status) {
+  if (status === 'pending') return 'bg-warning text-dark'
+  if (status === 'disabled') return 'bg-secondary'
+  return 'bg-success'
+}
 
 function roleLabel(role) {
   const opt = roleOptions.value.find(r => r.value === role)
@@ -123,6 +157,27 @@ async function delUser(u) {
     loadUsers()
   } catch (e) {
     err.value = errText(e) || '删除失败'
+  }
+}
+
+async function approve(u) {
+  try {
+    await apiApproveUser(u.id)
+    err.value = ''
+    loadUsers()
+  } catch (e) {
+    err.value = errText(e) || '审批失败'
+  }
+}
+
+async function reject(u) {
+  if (!confirm('驳回后该账号将被删除，确认驳回 ' + u.account + ' ？')) return
+  try {
+    await apiRejectUser(u.id)
+    err.value = ''
+    loadUsers()
+  } catch (e) {
+    err.value = errText(e) || '驳回失败'
   }
 }
 

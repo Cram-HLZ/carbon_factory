@@ -10,7 +10,7 @@
         <li class="nav-item">
           <button class="nav-link" :class="{ active: tab === 'login' }" @click="switchTab('login')">登 录</button>
         </li>
-        <li class="nav-item">
+        <li class="nav-item" v-if="registerEnabled">
           <button class="nav-link" :class="{ active: tab === 'register' }" @click="switchTab('register')">注 册</button>
         </li>
       </ul>
@@ -35,6 +35,7 @@
 
       <!-- 注册 -->
       <div v-show="tab === 'register'">
+        <div v-if="regOk" class="alert alert-success py-2 small">{{ regOk }}</div>
         <div v-if="regErr" class="alert alert-danger py-2 small">{{ regErr }}</div>
         <div class="mb-3">
           <label class="form-label small">账号</label>
@@ -55,16 +56,19 @@
           </div>
         </div>
         <button class="btn w-100 text-white" style="background:#10b981" :disabled="registering" @click="doRegister">{{ registering ? '注册中…' : '注 册' }}</button>
-        <div class="text-secondary small mt-3">注册账号默认为「运维岗」，可查看设备与告警</div>
+        <div class="text-secondary small mt-3">
+          注册账号默认为「运维岗」，{{ requiresApproval ? '需 IT管理员审批通过后才能登录' : '注册后可直接登录' }}
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { getRegisterConfig } from '../api'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -72,6 +76,9 @@ const auth = useAuthStore()
 const tab = ref('login')
 const loginErr = ref('')
 const regErr = ref('')
+const regOk = ref('')
+const registerEnabled = ref(true)
+const requiresApproval = ref(false)
 const logging = ref(false)
 const registering = ref(false)
 const showLoginPwd = ref(false)
@@ -84,6 +91,7 @@ function switchTab(t) {
   tab.value = t
   loginErr.value = ''
   regErr.value = ''
+  regOk.value = ''
 }
 
 async function doLogin() {
@@ -102,12 +110,21 @@ async function doLogin() {
 
 async function doRegister() {
   regErr.value = ''
+  regOk.value = ''
   if (reg.account.length < 3) { regErr.value = '账号至少 3 位'; return }
   if (reg.password.length < 6) { regErr.value = '密码至少 6 位'; return }
   if (reg.password !== reg.password2) { regErr.value = '两次输入的密码不一致'; return }
   registering.value = true
   try {
-    await auth.register(reg.account, reg.password)
+    const data = await auth.register(reg.account, reg.password)
+    if (data && data.pending) {
+      // 审批制：不自动登录，提示等待管理员审批
+      regOk.value = data.message || '注册成功，请等待管理员审批后登录'
+      reg.account = ''
+      reg.password = ''
+      reg.password2 = ''
+      return
+    }
     router.push('/overview')
   } catch (e) {
     regErr.value = errMsg(e) || '注册失败，请检查后端服务'
@@ -120,6 +137,17 @@ function errMsg(e) {
   const d = e && e.response && e.response.data
   return (d && (d.detail || d.message)) || (e && e.message) || ''
 }
+
+onMounted(async () => {
+  try {
+    const cfg = await getRegisterConfig()
+    registerEnabled.value = cfg.enabled !== false
+    requiresApproval.value = cfg.requires_approval === true
+    if (!registerEnabled.value && tab.value === 'register') tab.value = 'login'
+  } catch (e) {
+    // 配置读取失败时保持默认（开放注册），不影响登录
+  }
+})
 </script>
 
 <style scoped>

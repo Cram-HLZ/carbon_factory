@@ -146,6 +146,7 @@ class User(Base):
     permissions: Mapped[List] = mapped_column(JSON, nullable=True, comment='权限列表（JSON）')
     scope_type: Mapped[str] = mapped_column(String(16), nullable=False, default='all', comment='数据范围 all/factory/workshop')
     scope_value: Mapped[str] = mapped_column(String(32), nullable=True, comment='范围值：工厂code(F-01) 或 车间id(WS-01)')
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default='active', comment='账号状态 active/pending/disabled')
 
 
 class MrvReport(Base):

@@ -3,6 +3,8 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 COPY web/package*.json ./
+# 国内构建加速：npm 走 npmmirror
+ENV NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
 RUN npm ci || npm install
 COPY web/ ./
 # 生产走 Nginx 同源反代 /api，覆盖默认的 http://localhost:8001/api

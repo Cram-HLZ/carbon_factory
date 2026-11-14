@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -34,11 +34,21 @@ from backend.security import (
     require_roles,
     verify_password,
 )
-from config.settings import DATA_SCOPES, ORGANIZATION_TREE, ROLES, WORKSHOPS
+from config.settings import (
+    DATA_SCOPES,
+    ORGANIZATION_TREE,
+    REGISTER_ENABLED,
+    REGISTER_REQUIRES_APPROVAL,
+    ROLES,
+    WORKSHOPS,
+)
 from database.database import get_db
 from database.models import User
 
 router = APIRouter(prefix='/api/auth', tags=['认证与权限'])
+
+# 账号状态 → 中文（前端展示用）
+USER_STATUS_LABELS = {'active': '正常', 'pending': '待审批', 'disabled': '已停用'}
 
 
 # ============================================================
@@ -88,6 +98,7 @@ def _scope_label(scope_type: Optional[str], scope_value: Optional[str]) -> str:
 def _user_out(u: User) -> dict:
     """用户 → 对外结构（不含密码哈希）"""
     permissions = u.permissions if u.permissions is not None else ROLES.get(u.role, {}).get('permissions', [])
+    user_status = getattr(u, 'status', 'active') or 'active'
     return {
         'id': u.id,
         'account': u.account,
@@ -97,6 +108,8 @@ def _user_out(u: User) -> dict:
         'scope_type': getattr(u, 'scope_type', 'all') or 'all',
         'scope_value': getattr(u, 'scope_value', None),
         'scope_label': _scope_label(getattr(u, 'scope_type', 'all'), getattr(u, 'scope_value', None)),
+        'status': user_status,
+        'status_name': USER_STATUS_LABELS.get(user_status, user_status),
     }
 
 
@@ -152,6 +165,11 @@ async def login(req: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.account == req.account).first()
     if user is None or not verify_password(req.password, user.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, '账号或密码错误')
+    user_status = getattr(user, 'status', 'active') or 'active'
+    if user_status == 'pending':
+        raise HTTPException(status.HTTP_403_FORBIDDEN, '账号待 IT管理员审批，暂不能登录')
+    if user_status != 'active':
+        raise HTTPException(status.HTTP_403_FORBIDDEN, '账号已停用，请联系 IT管理员')
     token = create_access_token(user.account, user.role)
     return {
         'access_token': token,
@@ -160,8 +178,15 @@ async def login(req: LoginRequest, db: Session = Depends(get_db)):
     }
 
 
-@router.post('/register', summary='用户注册（固定为运维岗，注册即登录）', status_code=status.HTTP_201_CREATED)
+@router.get('/register-config', summary='注册策略（公开，前端据此隐藏注册入口）')
+async def register_config():
+    return {'enabled': REGISTER_ENABLED, 'requires_approval': REGISTER_REQUIRES_APPROVAL}
+
+
+@router.post('/register', summary='用户注册（受注册开关与审批策略控制）', status_code=status.HTTP_201_CREATED)
 async def register(req: RegisterRequest, db: Session = Depends(get_db)):
+    if not REGISTER_ENABLED:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, '系统已关闭自主注册，请联系 IT管理员开通账号')
     # 开放注册固定为最低权限角色，避免任何人自选管理层/IT管理员造成越权
     role = 'operator'
     if db.query(User).filter(User.account == req.account).first():
@@ -171,10 +196,18 @@ async def register(req: RegisterRequest, db: Session = Depends(get_db)):
         role=role,
         password_hash=hash_password(req.password),
         permissions=_resolve_permissions(role, None),
+        status='pending' if REGISTER_REQUIRES_APPROVAL else 'active',
     )
     db.add(user)
     db.commit()
     db.refresh(user)
+    if REGISTER_REQUIRES_APPROVAL:
+        # 审批制：不签发令牌，待 IT管理员通过后再登录
+        return {
+            'pending': True,
+            'message': '注册成功，请等待 IT管理员审批后登录',
+            'user': _user_out(user),
+        }
     token = create_access_token(user.account, user.role)
     return {
         'access_token': token,
@@ -239,12 +272,16 @@ async def org_tree(_: User = Depends(get_current_user)):
 # ============================================================
 # 角色管理（仅 IT管理员）
 # ============================================================
-@router.get('/users', summary='列出全部用户')
+@router.get('/users', summary='列出全部用户（可按状态过滤）')
 async def list_users(
+    user_status: Optional[str] = Query(None, alias='status', description='active/pending/disabled'),
     db: Session = Depends(get_db),
     _: User = Depends(require_roles('it_admin')),
 ):
-    users = db.query(User).order_by(User.id).all()
+    q = db.query(User)
+    if user_status:
+        q = q.filter(User.status == user_status)
+    users = q.order_by(User.id).all()
     return [_user_out(u) for u in users]
 
 
@@ -270,6 +307,40 @@ async def create_user(
     db.commit()
     db.refresh(user)
     return _user_out(user)
+
+
+@router.post('/users/{user_id}/approve', summary='审批通过待审批账号')
+async def approve_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles('it_admin')),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, '用户不存在')
+    if (getattr(user, 'status', 'active') or 'active') != 'pending':
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, '该账号不在待审批状态')
+    user.status = 'active'
+    db.commit()
+    db.refresh(user)
+    return _user_out(user)
+
+
+@router.post('/users/{user_id}/reject', summary='驳回（删除）待审批账号')
+async def reject_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles('it_admin')),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, '用户不存在')
+    if (getattr(user, 'status', 'active') or 'active') != 'pending':
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, '仅可驳回待审批账号')
+    account = user.account
+    db.delete(user)
+    db.commit()
+    return {'message': f'已驳回并删除账号 {account}'}
 
 
 @router.put('/users/{user_id}', summary='更新用户')

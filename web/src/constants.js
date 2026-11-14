@@ -3,8 +3,18 @@
 
 export const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001/api'
 
-export const WS_ALERT_URL =
-  API_BASE.replace(/^http/, 'ws').replace(/\/api$/, '') + '/ws/alerts'
+// WebSocket 地址：兼容两种模式
+//   开发：VITE_API_BASE 为绝对地址 → 直接换算成 ws://localhost:8001/ws/alerts
+//   生产：VITE_API_BASE=/api（Nginx 同源反代）→ 用当前页面域名拼 wss://<域名>/ws/alerts
+function _wsBase() {
+  if (/^https?:\/\//i.test(API_BASE)) {
+    return API_BASE.replace(/^http/i, 'ws').replace(/\/api$/, '')
+  }
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${proto}//${window.location.host}`
+}
+
+export const WS_ALERT_URL = _wsBase() + '/ws/alerts'
 
 export const ROLE_NAMES = { it_admin: 'IT管理员', management: '管理层', operator: '运维岗' }
 

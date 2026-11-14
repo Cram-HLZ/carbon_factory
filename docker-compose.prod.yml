@@ -1,0 +1,14 @@
+# 生产环境覆盖层：容器重启策略 + 仅绑回环端口（HTTPS 交给宿主机 Caddy/Nginx）
+# 用法：docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# 注意：ports 的 !override 需要 Docker Compose v2.24+（Ubuntu 24.04 自带版本满足）
+services:
+  algo:
+    restart: unless-stopped
+
+  backend:
+    restart: unless-stopped
+
+  web:
+    restart: unless-stopped
+    ports: !override
+      - "127.0.0.1:8080:80"
